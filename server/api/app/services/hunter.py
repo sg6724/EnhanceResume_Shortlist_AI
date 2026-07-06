@@ -47,27 +47,22 @@ def _month_key() -> str:
 
 
 async def hunter_quota_remaining(sb) -> int:
-    res = await (
-        sb.table("api_quota_usage").select("count")
-        .eq("provider", "hunter").eq("month", _month_key())
-        .maybe_single().execute()
-    )
+    try:
+        res = await (
+            sb.table("api_quota_usage").select("count")
+            .eq("provider", "hunter").eq("month", _month_key())
+            .maybe_single().execute()
+        )
+    except Exception as e:
+        print(f"[hunter] quota check error: {e}")
+        return 0
     used = res.data["count"] if res and res.data else 0
     return max(0, HUNTER_MONTHLY_LIMIT - used)
 
 
 async def increment_hunter_quota(sb) -> None:
     month = _month_key()
-    res = await (
-        sb.table("api_quota_usage").select("id, count")
-        .eq("provider", "hunter").eq("month", month)
-        .maybe_single().execute()
-    )
-    if res and res.data:
-        await sb.table("api_quota_usage").update(
-            {"count": res.data["count"] + 1}
-        ).eq("id", res.data["id"]).execute()
-    else:
-        await sb.table("api_quota_usage").insert(
-            {"provider": "hunter", "month": month, "count": 1}
-        ).execute()
+    try:
+        await sb.rpc("increment_api_quota", {"p_provider": "hunter", "p_month": month}).execute()
+    except Exception as e:
+        print(f"[hunter] quota increment error: {e}")
