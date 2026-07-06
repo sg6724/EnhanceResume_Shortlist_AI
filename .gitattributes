@@ -1,0 +1,8 @@
+# Normalize line endings: LF in the repo for all text; let Git handle the working tree.
+* text=auto eol=lf
+
+# Binary assets (don't touch).
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary

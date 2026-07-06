@@ -1,0 +1,127 @@
+"use client";
+import { useState } from "react";
+import { api, type MasterResumeUploadResult } from "@/lib/api";
+import clsx from "clsx";
+
+const EXAMPLE_TEX = `\\documentclass[11pt,a4paper]{article}
+\\usepackage[margin=1in]{geometry}
+\\usepackage{enumitem}
+\\begin{document}
+
+\\begin{center}
+  {\\Large\\bfseries Your Name}\\\\[4pt]
+  your@email.com \\quad | \\quad github.com/yourname
+\\end{center}
+
+\\section*{Summary}
+Experienced AI Engineer with 3+ years building production LLM systems,
+RAG pipelines, and scalable ML infrastructure.
+
+\\section*{Experience}
+\\begin{itemize}[leftmargin=*]
+  \\item Led development of an LLM-powered document Q\\&A system at Acme Corp (2022--2024)
+  \\item Built ML pipelines processing 1M+ records daily with PyTorch and FastAPI
+  \\item Reduced inference latency by 40\\% via model quantisation and caching
+\\end{itemize}
+
+\\section*{Skills}
+Python, PyTorch, FastAPI, LangChain, RAG, LLM fine-tuning, Docker, PostgreSQL
+
+\\end{document}`;
+
+export default function ResumePage() {
+  const [tex, setTex] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<MasterResumeUploadResult | null>(null);
+  const [error, setError] = useState("");
+
+  const upload = async () => {
+    if (!tex.trim()) return;
+    setUploading(true);
+    setError("");
+    setResult(null);
+    try {
+      const r = await api.uploadResume(tex);
+      setResult(r);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Master Resume</h1>
+        <p className="text-muted text-sm mt-1">
+          Your LaTeX source of truth. Agents fork from this — they never modify it
+          directly. Uploading a new version marks existing copies as stale.
+        </p>
+      </div>
+
+      <div className="bg-panel border border-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="text-xs text-muted uppercase tracking-wider font-medium">
+            LaTeX Source (.tex)
+          </label>
+          {!tex && (
+            <button
+              onClick={() => setTex(EXAMPLE_TEX)}
+              className="text-xs text-accent hover:underline"
+            >
+              Load example
+            </button>
+          )}
+        </div>
+        <textarea
+          value={tex}
+          onChange={(e) => setTex(e.target.value)}
+          placeholder={EXAMPLE_TEX}
+          rows={22}
+          spellCheck={false}
+          className="w-full bg-bg border border-border rounded-lg px-4 py-3 text-sm font-mono text-text placeholder:text-muted/40 focus:outline-none focus:border-accent resize-none transition-colors"
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted">{tex.length.toLocaleString()} chars</span>
+          <button
+            onClick={upload}
+            disabled={uploading || !tex.trim()}
+            className={clsx(
+              "font-semibold px-6 py-2.5 rounded-xl text-sm transition-all",
+              uploading || !tex.trim()
+                ? "bg-accent/30 text-accent/50 cursor-not-allowed"
+                : "bg-accent text-bg hover:bg-accent/90 active:scale-95"
+            )}
+          >
+            {uploading ? "Uploading…" : "Upload Master Resume"}
+          </button>
+        </div>
+      </div>
+
+      {result && (
+        <div className="bg-ok/10 border border-ok/30 rounded-xl p-4 text-sm">
+          <div className="font-semibold text-ok mb-1">Uploaded successfully</div>
+          <div className="text-muted space-y-0.5 text-xs">
+            <div>Version: <span className="text-text">{result.version}</span></div>
+            <div>Plain text extracted: <span className="text-text">{result.plain_text_chars.toLocaleString()} chars</span></div>
+            <div>ID: <span className="text-text font-mono">{result.id}</span></div>
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="bg-bad/10 border border-bad/30 rounded-xl p-4 text-sm text-bad">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-panel border border-border rounded-xl p-4 text-xs text-muted space-y-1.5">
+        <div className="font-semibold text-text text-sm mb-2">Rules the agents follow</div>
+        <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\\begin{"{}"}...\\end{"{}"}</code> blocks</div>
+        <div>• Never add or delete LaTeX environments</div>
+        <div>• Never modify your preamble or packages</div>
+        <div>• Return the full .tex + a diff of every change made</div>
+      </div>
+    </div>
+  );
+}

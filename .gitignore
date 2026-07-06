@@ -1,0 +1,43 @@
+# ---- Secrets ----
+.env
+.env.*
+!.env.example
+*.local
+.claude/settings.local.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+
+# ---- LaTeX ----
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+*.log
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- Docker ----
+*.pid
+redisdata/

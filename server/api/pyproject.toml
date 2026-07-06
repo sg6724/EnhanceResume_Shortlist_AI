@@ -1,0 +1,29 @@
+[project]
+name = "job-hunt-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+    "httpx==0.28.1",
+    "supabase>=2.10.0",
+    "pylatexenc==2.10",
+    "procrastinate[asyncpg]>=2.10.0",
+    "psycopg[binary]>=3.1.0",
+    "agno>=1.1.0",
+    "google-genai>=1.0.0",
+    "rank-bm25>=0.2.2",
+    "resend>=2.0.0",
+    "diff-match-patch>=20230430",
+    "beautifulsoup4>=4.12.0",
+    "aiohttp>=3.10.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
