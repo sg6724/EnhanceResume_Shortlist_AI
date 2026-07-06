@@ -15,9 +15,6 @@ MAX_DRAFT_ATTEMPTS = 3
 
 
 async def _log(sb: AsyncClient, jd_id: str | None, agent: str, log: str, reasoning: str = "") -> None:
-    if not jd_id:
-        print(f"[{agent}] {log}")
-        return
     await sb.table("agent_traces").insert({
         "jd_id": jd_id, "agent_name": agent,
         "log": log[:2000], "reasoning": reasoning[:5000],
@@ -76,83 +73,88 @@ async def run_outreach_cycle(user_id: str, sb: AsyncClient, http: httpx.AsyncCli
 
     found = drafted = failed = 0
     for target in pending.data:
-        tid = target["id"]
-        await sb.table("outreach_targets").update(
-            {"attempts": target["attempts"] + 1, "updated_at": datetime.now(timezone.utc).isoformat()}
-        ).eq("id", tid).execute()
+        try:
+            tid = target["id"]
+            await sb.table("outreach_targets").update(
+                {"attempts": target["attempts"] + 1, "updated_at": datetime.now(timezone.utc).isoformat()}
+            ).eq("id", tid).execute()
 
-        if target["status"] == "contact_found":
-            # Contact already known (earlier cycle or manual entry) — only drafting remains
-            contact = {"found": True, "company_domain": target.get("company_domain"),
-                       "founder_name": target.get("founder_name") or "there",
-                       "founder_title": target.get("founder_title") or "",
-                       "founder_email": target["founder_email"]}
-        else:
-            contact = await find_contact(http, sb, target["company_name"], target.get("company_domain"))
-            if not contact["found"]:
+            if target["status"] == "contact_found":
+                # Contact already known (earlier cycle or manual entry) — only drafting remains
+                contact = {"found": True, "company_domain": target.get("company_domain"),
+                           "founder_name": target.get("founder_name") or "there",
+                           "founder_title": target.get("founder_title") or "",
+                           "founder_email": target["founder_email"]}
+            else:
+                contact = await find_contact(http, sb, target["company_name"], target.get("company_domain"))
+                if not contact["found"]:
+                    await sb.table("outreach_targets").update({
+                        "status": "contact_not_found",
+                        "company_domain": contact.get("company_domain"),
+                        "failure_reason": contact.get("failure_reason", ""),
+                    }).eq("id", tid).execute()
+                    await _log(sb, target.get("jd_id"), "contact_finder",
+                               f"{target['company_name']}: {contact.get('failure_reason', '')}")
+                    failed += 1
+                    continue
+
                 await sb.table("outreach_targets").update({
-                    "status": "contact_not_found",
-                    "company_domain": contact.get("company_domain"),
-                    "failure_reason": contact.get("failure_reason", ""),
+                    "status": "contact_found",
+                    "company_domain": contact["company_domain"],
+                    "founder_name": contact["founder_name"],
+                    "founder_title": contact["founder_title"],
+                    "founder_email": contact["founder_email"],
+                    "email_confidence": contact["email_confidence"],
+                    "contact_method": contact["contact_method"],
                 }).eq("id", tid).execute()
                 await _log(sb, target.get("jd_id"), "contact_finder",
-                           f"{target['company_name']}: {contact.get('failure_reason', '')}")
-                failed += 1
-                continue
+                           f"{target['company_name']}: {contact['founder_name']} "
+                           f"<{contact['founder_email']}> ({contact['email_confidence']})")
+                found += 1
 
-            await sb.table("outreach_targets").update({
-                "status": "contact_found",
-                "company_domain": contact["company_domain"],
-                "founder_name": contact["founder_name"],
-                "founder_title": contact["founder_title"],
-                "founder_email": contact["founder_email"],
-                "email_confidence": contact["email_confidence"],
-                "contact_method": contact["contact_method"],
-            }).eq("id", tid).execute()
-            await _log(sb, target.get("jd_id"), "contact_finder",
-                       f"{target['company_name']}: {contact['founder_name']} "
-                       f"<{contact['founder_email']}> ({contact['email_confidence']})")
-            found += 1
+            # Draft the letter
+            jd_text = ""
+            resume_copy_id = None
+            if target.get("jd_id"):
+                jd_res = await sb.table("scraped_jds").select("raw_text").eq("id", target["jd_id"]).maybe_single().execute()
+                jd_text = jd_res.data["raw_text"] if jd_res and jd_res.data else ""
+                copy_res = await (
+                    sb.table("resume_copies").select("id").eq("jd_id", target["jd_id"])
+                    .eq("status", "compiled").order("created_at", desc=True).limit(1).execute()
+                )
+                if copy_res.data:
+                    resume_copy_id = copy_res.data[0]["id"]
 
-        # Draft the letter
-        jd_text = ""
-        resume_copy_id = None
-        if target.get("jd_id"):
-            jd_res = await sb.table("scraped_jds").select("raw_text").eq("id", target["jd_id"]).maybe_single().execute()
-            jd_text = jd_res.data["raw_text"] if jd_res and jd_res.data else ""
-            copy_res = await (
-                sb.table("resume_copies").select("id").eq("jd_id", target["jd_id"])
-                .eq("status", "compiled").order("created_at", desc=True).limit(1).execute()
-            )
-            if copy_res.data:
-                resume_copy_id = copy_res.data[0]["id"]
+            role = target.get("role_title") or ""
+            if not role:
+                pos_res = await (
+                    sb.table("target_positions").select("title").eq("user_id", user_id)
+                    .eq("is_active", True).limit(1).execute()
+                )
+                role = pos_res.data[0]["title"] if pos_res.data else "an engineering role"
 
-        role = target.get("role_title") or ""
-        if not role:
-            pos_res = await (
-                sb.table("target_positions").select("title").eq("user_id", user_id)
-                .eq("is_active", True).limit(1).execute()
-            )
-            role = pos_res.data[0]["title"] if pos_res.data else "an engineering role"
+            try:
+                subject, body = await write_letter(
+                    resume_text=resume_text, jd_text=jd_text, role_title=role,
+                    founder_name=contact["founder_name"], founder_title=contact["founder_title"],
+                    company_name=target["company_name"],
+                )
+            except Exception as e:
+                await _log(sb, target.get("jd_id"), "letter_writer", f"draft failed: {e}")
+                continue  # stays contact_found; retried next cycle (attempts capped)
 
-        try:
-            subject, body = await write_letter(
-                resume_text=resume_text, jd_text=jd_text, role_title=role,
-                founder_name=contact["founder_name"], founder_title=contact["founder_title"],
-                company_name=target["company_name"],
-            )
+            await sb.table("outreach_drafts").insert({
+                "target_id": tid, "subject": subject, "body": body,
+                "resume_copy_id": resume_copy_id,
+            }).execute()
+            await sb.table("outreach_targets").update({"status": "drafted"}).eq("id", tid).execute()
+            await _log(sb, target.get("jd_id"), "letter_writer",
+                       f"drafted for {target['company_name']}: {subject}")
+            drafted += 1
         except Exception as e:
-            await _log(sb, target.get("jd_id"), "letter_writer", f"draft failed: {e}")
-            continue  # stays contact_found; retried next cycle (attempts capped)
-
-        await sb.table("outreach_drafts").insert({
-            "target_id": tid, "subject": subject, "body": body,
-            "resume_copy_id": resume_copy_id,
-        }).execute()
-        await sb.table("outreach_targets").update({"status": "drafted"}).eq("id", tid).execute()
-        await _log(sb, target.get("jd_id"), "letter_writer",
-                   f"drafted for {target['company_name']}: {subject}")
-        drafted += 1
+            await _log(sb, target.get("jd_id"), "outreach_orchestrator",
+                       f"target {target['company_name']} failed: {e}")
+            continue
 
     await sb.table("users").update(
         {"outreach_last_run_at": datetime.now(timezone.utc).isoformat()}
@@ -195,6 +197,8 @@ async def send_outreach(draft_id: str, sb: AsyncClient, http: httpx.AsyncClient)
             pdf_bytes = resp.content
         else:
             print(f"[outreach] compile failed ({resp.status_code}); sending without attachment")
+            await _log(sb, target.get("jd_id"), "compiler",
+                       f"compile failed ({resp.status_code}); sending without attachment")
 
     subject = draft.get("edited_subject") or draft["subject"]
     body = draft.get("edited_body") or draft["body"]
