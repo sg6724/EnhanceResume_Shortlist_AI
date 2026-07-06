@@ -47,13 +47,35 @@ def guess_emails(first: str, last: str, domain: str) -> list[str]:
     return [f"{f}@{domain}", f"{f}.{l}@{domain}", f"{f[0]}{l}@{domain}"]
 
 
+def _domain_page_matches(token: str, title: str | None, page_text: str) -> bool:
+    """Decide whether a fetched homepage plausibly belongs to `company_name`.
+
+    Short tokens (e.g. "zip", "ai", "co") are common for startup slugs but are
+    also common English substrings, so an arbitrary substring match against
+    the whole page body produces false positives on nearly any live site.
+    Require a minimum token length, and then require the token to appear in
+    the page `<title>` (a much stronger, more specific signal than anywhere
+    in the body text).
+    """
+    if len(token) < 4:
+        return False
+    normalized_title = re.sub(r"[^a-z0-9]", "", (title or "").lower())
+    return token in normalized_title
+
+
 async def _resolve_domain(http: httpx.AsyncClient, company_name: str) -> str | None:
-    """Try candidate domains; accept the first whose homepage mentions the company."""
+    """Try candidate domains; accept the first whose homepage <title> mentions the company."""
+    from bs4 import BeautifulSoup
+
     token = re.sub(r"[^a-z0-9]", "", _COMPANY_SUFFIX_RE.sub("", company_name.lower()))
     for domain in candidate_domains(company_name):
         try:
             resp = await http.get(f"https://{domain}", follow_redirects=True, timeout=10.0)
-            if resp.status_code == 200 and token[:8] in re.sub(r"[^a-z0-9]", "", resp.text.lower()):
+            if resp.status_code != 200:
+                continue
+            soup = BeautifulSoup(resp.text, "html.parser")
+            title = soup.title.string if soup.title else None
+            if _domain_page_matches(token, title, resp.text.lower()):
                 return domain
         except Exception:
             continue
