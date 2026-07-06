@@ -43,3 +43,33 @@ def notify_compile_failed(to: str, company: str, title: str) -> None:
         f"<strong>{title}</strong> at {company}.</p>"
         f"<p>Check the <a href='http://localhost:3000/traces'>Observability panel</a> for the error log.</p>",
     )
+
+
+def send_outreach_email(
+    to: str, subject: str, body_text: str,
+    pdf_bytes: bytes | None, pdf_filename: str = "resume.pdf",
+) -> str:
+    """Send an outreach email via Resend with optional PDF attachment.
+    Returns the Resend message id. Raises RuntimeError when unconfigured."""
+    if not settings.resend_api_key:
+        raise RuntimeError("RESEND_API_KEY not configured")
+    import base64
+    import resend
+    resend.api_key = settings.resend_api_key
+
+    html = "".join(f"<p>{line}</p>" for line in body_text.split("\n") if line.strip())
+    params: dict = {
+        "from": settings.resend_from,
+        "to": [to],
+        "reply_to": settings.user_email,
+        "subject": subject,
+        "html": html,
+        "text": body_text,
+    }
+    if pdf_bytes:
+        params["attachments"] = [{
+            "filename": pdf_filename,
+            "content": base64.b64encode(pdf_bytes).decode(),
+        }]
+    result = resend.Emails.send(params)
+    return result.get("id", "")
