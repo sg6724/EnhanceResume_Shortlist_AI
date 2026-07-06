@@ -54,10 +54,13 @@ def send_outreach_email(
     if not settings.resend_api_key:
         raise RuntimeError("RESEND_API_KEY not configured")
     import base64
+    import html as html_lib
     import resend
     resend.api_key = settings.resend_api_key
 
-    html = "".join(f"<p>{line}</p>" for line in body_text.split("\n") if line.strip())
+    html = "".join(
+        f"<p>{html_lib.escape(line)}</p>" for line in body_text.split("\n") if line.strip()
+    )
     params: dict = {
         "from": settings.resend_from,
         "to": [to],

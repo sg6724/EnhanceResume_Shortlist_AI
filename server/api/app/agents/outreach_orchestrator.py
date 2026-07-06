@@ -214,6 +214,7 @@ async def send_outreach(draft_id: str, sb: AsyncClient, http: httpx.AsyncClient)
         )
     except Exception as e:
         await sb.table("outreach_drafts").update({"send_error": str(e)[:500]}).eq("id", draft_id).execute()
+        await sb.table("outreach_targets").update({"status": "drafted"}).eq("id", target["id"]).execute()
         await _log(sb, target.get("jd_id"), "outreach_sender", f"send FAILED: {e}")
         return {"error": f"send failed: {e}"}
 
