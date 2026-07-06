@@ -129,6 +129,8 @@ async def patch_draft(draft_id: str, body: DraftPatch, request: Request):
 
 @router.post("/drafts/{draft_id}/approve")
 async def approve_draft(draft_id: str, request: Request):
+    if not settings.database_url:
+        raise HTTPException(503, "DATABASE_URL not set — queue unavailable")
     sb = request.app.state.supabase
     draft = await (
         sb.table("outreach_drafts").select("id, target_id, outreach_targets(status, founder_email)")
@@ -159,6 +161,8 @@ async def reject_draft(draft_id: str, request: Request):
 
 @router.post("/run")
 async def run_now(request: Request):
+    if not settings.database_url:
+        raise HTTPException(503, "DATABASE_URL not set — Procrastinate queue unavailable")
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
     from ..queue import run_outreach_task
