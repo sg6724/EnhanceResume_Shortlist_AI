@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     resend_api_key: str = ""
     resend_from: str = "noreply@jobhunt.ai"
+    hunter_api_key: str = ""
 
     adzuna_app_id: str = ""
     adzuna_api_key: str = ""
