@@ -152,8 +152,12 @@ async def run_outreach_cycle(user_id: str, sb: AsyncClient, http: httpx.AsyncCli
                        f"drafted for {target['company_name']}: {subject}")
             drafted += 1
         except Exception as e:
-            await _log(sb, target.get("jd_id"), "outreach_orchestrator",
-                       f"target {target['company_name']} failed: {e}")
+            try:
+                await _log(sb, target.get("jd_id"), "outreach_orchestrator",
+                           f"target {target['company_name']} failed: {e}")
+            except Exception as log_err:
+                print(f"[outreach] target {target['company_name']} failed: {e} "
+                      f"(also failed to log: {log_err})")
             continue
 
     await sb.table("users").update(
