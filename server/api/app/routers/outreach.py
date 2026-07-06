@@ -105,6 +105,7 @@ async def list_drafts(request: Request):
         sb.table("outreach_drafts")
         .select("*, outreach_targets!inner(*)")
         .eq("outreach_targets.user_id", uid)
+        .eq("outreach_targets.status", "drafted")
         .is_("sent_at", "null")
         .order("created_at", desc=True).execute()
     )
