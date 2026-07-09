@@ -129,7 +129,12 @@ class FakeQuery:
             return FakeResult(matches)
 
         if self._order_col:
-            matches = sorted(matches, key=lambda r: r.get(self._order_col), reverse=self._order_desc)
+            # Sort, placing None values at the end regardless of desc
+            matches = sorted(
+                matches,
+                key=lambda r: (r.get(self._order_col) is None, r.get(self._order_col)),
+                reverse=self._order_desc
+            )
         if self._range:
             start, end = self._range
             matches = matches[start : end + 1]
