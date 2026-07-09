@@ -130,13 +130,14 @@ class User(BaseModel):
     top_n: int = 5
     timeout_minutes: int = 30
     max_compiler_retries: int = 3
-    max_resume_versions: int | None = None
-    max_semantic_distance: float | None = None
-    scraper_delay_ms: int | None = None
+    max_resume_versions: int = 3
+    max_semantic_distance: float = 0.8
+    scraper_delay_ms: int = 2000
     outreach_enabled: bool = True
     outreach_interval_hours: int = 24
     outreach_last_run_at: datetime | None = None
     outreach_batch_size: int = 3
+    created_at: datetime | None = None
 
 
 # --- Value objects (not DB rows) shared across integrations ---------------

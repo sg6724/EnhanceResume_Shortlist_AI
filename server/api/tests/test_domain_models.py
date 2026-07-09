@@ -92,6 +92,10 @@ def test_user_defaults_match_current_db_defaults():
     assert u.top_n == 5
     assert u.outreach_enabled is True
     assert u.outreach_batch_size == 3
+    assert u.max_resume_versions == 3
+    assert u.max_semantic_distance == 0.8
+    assert u.scraper_delay_ms == 2000
+    assert u.created_at is None
 
 
 def test_contact_value_object():
