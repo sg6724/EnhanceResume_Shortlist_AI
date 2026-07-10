@@ -15,11 +15,16 @@ from ..data.repositories.quota_repo import QuotaRepo
 from ..data.repositories.resume_repo import ResumeRepo
 from ..data.repositories.traces_repo import TracesRepo
 from ..data.repositories.users_repo import UsersRepo
+from ..integrations.compile.base import CompileClient
 from ..integrations.compile.http import HttpCompileClient
+from ..integrations.contacts.base import ContactProvider
 from ..integrations.contacts.sitescrape import SiteScrapeProvider
+from ..integrations.email.base import EmailSender
 from ..integrations.email.resend import ResendSender
 from ..integrations.jobs.adzuna import AdzunaSource
+from ..integrations.jobs.base import JobSource
 from ..integrations.jobs.remoteok import RemoteOkSource
+from ..integrations.llm.base import LlmClient
 from ..integrations.llm.gemini import GeminiClient
 from .config import Settings
 
@@ -42,11 +47,11 @@ class Container:
     traces: TracesRepo
     quota: QuotaRepo
 
-    llm: GeminiClient
-    email: ResendSender
-    compile: HttpCompileClient
-    job_sources: list = field(default_factory=list)
-    contact_providers: list = field(default_factory=list)
+    llm: LlmClient
+    email: EmailSender
+    compile: CompileClient
+    job_sources: list[JobSource] = field(default_factory=list)
+    contact_providers: list[ContactProvider] = field(default_factory=list)
 
 
 def build_container(settings: Settings, sb: Any, http: httpx.AsyncClient) -> Container:

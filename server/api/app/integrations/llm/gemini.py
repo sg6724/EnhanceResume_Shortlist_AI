@@ -32,7 +32,7 @@ class GeminiClient:
 
     async def generate(self, model: str, prompt: str) -> str:
         resp = await self._get_client().aio.models.generate_content(model=model, contents=prompt)
-        return resp.text
+        return resp.text or ""
 
     def embed(self, model: str, text: str) -> list[float]:
         result = self._get_client().models.embed_content(model=model, contents=text[:2048])
