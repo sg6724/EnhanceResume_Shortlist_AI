@@ -129,7 +129,13 @@ class FakeQuery:
             return FakeResult(matches)
 
         if self._order_col:
-            # Sort, placing None values at the end regardless of desc
+            # Sort key (None-safe): pairs a boolean "is this None" flag with the
+            # value so CPython's tuple comparison resolves via `==` on equal-None
+            # pairs instead of ever calling `<` on None (which raises TypeError).
+            # Net effect: for ascending order, None-valued rows sort LAST; for
+            # descending order (reverse=True), None-valued rows sort FIRST — this
+            # matches Postgres's own default NULLS ordering (NULLS LAST for ASC,
+            # NULLS FIRST for DESC).
             matches = sorted(
                 matches,
                 key=lambda r: (r.get(self._order_col) is None, r.get(self._order_col)),
