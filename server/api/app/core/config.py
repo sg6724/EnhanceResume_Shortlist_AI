@@ -12,6 +12,7 @@ class DbSettings(BaseModel):
 
 class LlmSettings(BaseModel):
     gemini_api_key: str = ""
+    groq_api_key: str = ""
 
 
 class EmailSettings(BaseModel):
@@ -40,6 +41,7 @@ class Settings(BaseSettings):
     compile_service_url: str = "http://localhost:8001"
 
     gemini_api_key: str = ""
+    groq_api_key: str = ""
     resend_api_key: str = ""
     resend_from: str = "noreply@jobhunt.ai"
     hunter_api_key: str = ""
@@ -60,7 +62,7 @@ class Settings(BaseSettings):
 
     @property
     def llm(self) -> LlmSettings:
-        return LlmSettings(gemini_api_key=self.gemini_api_key)
+        return LlmSettings(gemini_api_key=self.gemini_api_key, groq_api_key=self.groq_api_key)
 
     @property
     def email(self) -> EmailSettings:

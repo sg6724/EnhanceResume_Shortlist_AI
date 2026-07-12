@@ -6,6 +6,7 @@ def _make_settings(**overrides) -> Settings:
         supabase_url="https://x.supabase.co",
         supabase_service_key="svc-key",
         gemini_api_key="gem-key",
+        groq_api_key="groq-key",
         resend_api_key="re-key",
         resend_from="noreply@example.com",
         hunter_api_key="hunter-key",
@@ -23,6 +24,7 @@ def test_flat_fields_unchanged():
     assert s.supabase_url == "https://x.supabase.co"
     assert s.gemini_api_key == "gem-key"
     assert s.apollo_api_key == "apollo-key"
+    assert s.groq_api_key == "groq-key"
 
 
 def test_db_section():
@@ -34,6 +36,7 @@ def test_db_section():
 def test_llm_section():
     s = _make_settings()
     assert s.llm.gemini_api_key == "gem-key"
+    assert s.llm.groq_api_key == "groq-key"
 
 
 def test_contacts_section_includes_apollo_and_hunter_and_adzuna():
