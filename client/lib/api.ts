@@ -170,6 +170,7 @@ export const api = {
     }),
   markApplied: (id: string) =>
     req<ResumeCopy>(`/copies/${id}/apply`, { method: "PATCH" }),
+  copyPdfUrl: (id: string) => `${BASE}/copies/${id}/pdf`,
 
   // Checkpoints
   checkpoints: () => req<Checkpoint[]>("/checkpoints"),

@@ -22,6 +22,7 @@ export default function CopiesPage() {
   const [compiling, setCompiling] = useState(false);
   const [compileMsg, setCompileMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pdfRefreshKey, setPdfRefreshKey] = useState(0);
 
   const load = () => api.copies().then(setCopies).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -31,6 +32,7 @@ export default function CopiesPage() {
     setSelected(full);
     setTex(full.tex_content ?? "");
     setCompileMsg(null);
+    setPdfRefreshKey((k) => k + 1);
   };
 
   const recompile = async () => {
@@ -45,6 +47,7 @@ export default function CopiesPage() {
           : `Compile failed: ${(res.log ?? "").slice(0, 200)}`,
         ok: res.status === "compiled",
       });
+      if (res.status === "compiled") setPdfRefreshKey((k) => k + 1);
       await load();
     } catch (e: any) {
       setCompileMsg({ text: e.message, ok: false });
@@ -158,23 +161,39 @@ export default function CopiesPage() {
               </div>
             )}
 
-            {/* Monaco Editor */}
-            <div className="flex-1 border border-border rounded-xl overflow-hidden">
-              <MonacoEditor
-                height="100%"
-                language="latex"
-                theme="vs-dark"
-                value={tex}
-                onChange={(v) => setTex(v ?? "")}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 13,
-                  lineHeight: 20,
-                  wordWrap: "on",
-                  scrollBeyondLastLine: false,
-                  padding: { top: 12, bottom: 12 },
-                }}
-              />
+            {/* Editor + PDF preview */}
+            <div className="flex-1 flex gap-3 min-h-0">
+              <div className="flex-1 border border-border rounded-xl overflow-hidden">
+                <MonacoEditor
+                  height="100%"
+                  language="latex"
+                  theme="vs-dark"
+                  value={tex}
+                  onChange={(v) => setTex(v ?? "")}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    lineHeight: 20,
+                    wordWrap: "on",
+                    scrollBeyondLastLine: false,
+                    padding: { top: 12, bottom: 12 },
+                  }}
+                />
+              </div>
+              <div className="flex-1 border border-border rounded-xl overflow-hidden bg-bg">
+                {selected.pdf_storage_path ? (
+                  <embed
+                    key={pdfRefreshKey}
+                    src={`${api.copyPdfUrl(selected.id)}?t=${pdfRefreshKey}`}
+                    type="application/pdf"
+                    className="w-full h-full"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted text-sm">
+                    No PDF yet — recompile to generate one.
+                  </div>
+                )}
+              </div>
             </div>
           </>
         ) : (
