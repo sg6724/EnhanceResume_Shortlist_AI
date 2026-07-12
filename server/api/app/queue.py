@@ -103,9 +103,13 @@ async def outreach_tick(timestamp: int) -> None:
     from supabase import acreate_client
 
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    # Single-user app: settings.user_email identifies the one active account.
+    # Older/stale rows can linger in `users` (e.g. after the configured email
+    # changed) — without this filter, every row got an hourly outreach cycle
+    # queued against it forever, burning Hunter quota on dead accounts.
     users = await sb.table("users").select(
         "id, outreach_enabled, outreach_interval_hours, outreach_last_run_at"
-    ).execute()
+    ).eq("email", settings.user_email).execute()
     now = datetime.now(timezone.utc)
     for u in users.data:
         if not u.get("outreach_enabled", True):

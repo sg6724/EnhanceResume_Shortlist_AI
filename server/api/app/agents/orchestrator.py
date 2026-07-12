@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
 import httpx
 from supabase import AsyncClient
 
@@ -70,7 +68,6 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
     print(f"[orchestrator] Got {len(jds)} valid JDs")
 
     target_titles = [p["title"] for p in positions]
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=user["timeout_minutes"])
 
     # Process each JD
     above_threshold: list[tuple[float, dict, dict]] = []  # (score, jd_row, match_data)
@@ -145,7 +142,6 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             "user_id": user_id,
             "planned_diff": planned_diff,
             "status": "pending",
-            "expires_at": expires_at.isoformat(),
         }).execute()
         await _log(sb, jd_row["id"], "orchestrator",
                    f"Checkpoint created: {cp_ins.data[0]['id']}")
@@ -162,7 +158,6 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             "user_id": user_id,
             "planned_diff": planned_diff,
             "status": "approved",
-            "expires_at": expires_at.isoformat(),
         }).execute()
         cp_id = cp_ins.data[0]["id"]
         await rewrite_resume_task.defer_async(checkpoint_id=cp_id)

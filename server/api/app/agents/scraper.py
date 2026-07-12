@@ -55,7 +55,7 @@ async def _fetch_remoteok(keywords: list[str]) -> list[dict[str, Any]]:
             try:
                 async with session.get(
                     url,
-                    headers={"User-Agent": "Mozilla/5.0 JobHuntBot/1.0"},
+                    headers={"User-Agent": "Mozilla/5.0 GetHiredBot/1.0"},
                     timeout=aiohttp.ClientTimeout(total=20),
                 ) as resp:
                     if resp.status != 200:

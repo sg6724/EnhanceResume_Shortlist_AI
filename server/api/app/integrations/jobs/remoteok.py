@@ -51,7 +51,7 @@ class RemoteOkSource:
             try:
                 resp = await self._http.get(
                     f"https://remoteok.com/api?tag={tag}",
-                    headers={"User-Agent": "Mozilla/5.0 JobHuntBot/1.0"},
+                    headers={"User-Agent": "Mozilla/5.0 GetHiredBot/1.0"},
                     timeout=20.0,
                 )
                 if resp.status_code != 200:

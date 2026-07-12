@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "JobHunt AI",
+  title: "GetHired AI",
   description: "Agentic job-hunting platform — tailor your resume to every JD automatically.",
 };
 

@@ -57,21 +57,14 @@ export default function CheckpointsPage() {
             Awaiting Approval ({pending.length})
           </div>
           {pending.map((cp) => {
-            const expiresAt = new Date(cp.expires_at);
-            const minutesLeft = Math.max(0, Math.round((expiresAt.getTime() - Date.now()) / 60000));
             return (
               <div key={cp.id} className="bg-panel border border-warn/40 rounded-xl p-5 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-semibold text-text">
-                      {cp.scraped_jds?.title ?? "Unknown"}
-                    </div>
-                    <div className="text-muted text-sm">
-                      {cp.scraped_jds?.company ?? "Unknown"}
-                    </div>
+                <div>
+                  <div className="font-semibold text-text">
+                    {cp.scraped_jds?.title ?? "Unknown"}
                   </div>
-                  <div className="text-xs text-warn text-right flex-shrink-0">
-                    Auto-approves in {minutesLeft}m
+                  <div className="text-muted text-sm">
+                    {cp.scraped_jds?.company ?? "Unknown"}
                   </div>
                 </div>
 

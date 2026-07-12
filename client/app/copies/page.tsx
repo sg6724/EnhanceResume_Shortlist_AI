@@ -61,7 +61,7 @@ export default function CopiesPage() {
   return (
     <div className="flex gap-5 h-[calc(100vh-4rem)]">
       {/* Sidebar list */}
-      <div className="w-68 flex-shrink-0 overflow-y-auto space-y-1">
+      <div className="w-[17rem] flex-shrink-0 overflow-y-auto space-y-1">
         <div className="mb-4">
           <h1 className="text-xl font-bold tracking-tight text-text">Resume Copies</h1>
           <p className="text-muted text-xs mt-0.5">Select to view or edit.</p>
@@ -148,7 +148,7 @@ export default function CopiesPage() {
 
             {/* Editor + PDF preview */}
             <div className="flex-1 flex gap-3 min-h-0">
-              <div className="flex-1 border border-border rounded-xl overflow-hidden">
+              <div className="flex-1 min-w-0 border border-border rounded-xl overflow-hidden">
                 <MonacoEditor
                   height="100%"
                   language="latex"
@@ -165,7 +165,7 @@ export default function CopiesPage() {
                   }}
                 />
               </div>
-              <div className="flex-1 border border-border rounded-xl overflow-hidden bg-bg">
+              <div className="flex-1 min-w-0 border border-border rounded-xl overflow-hidden bg-bg">
                 {selected.pdf_storage_path ? (
                   <embed
                     key={pdfRefreshKey}

@@ -19,14 +19,15 @@ const NAV = [
 export default function Sidebar() {
   const path = usePathname();
   const [dbOk, setDbOk] = useState<boolean | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    api.health()
-      .then((h) => setDbOk(h.db))
-      .catch(() => setDbOk(false));
-    const t = setInterval(() => {
-      api.health().then((h) => setDbOk(h.db)).catch(() => setDbOk(false));
-    }, 30000);
+    const check = () =>
+      api.health()
+        .then((h) => { setDbOk(h.db); setUserEmail(h.user_email); })
+        .catch(() => setDbOk(false));
+    check();
+    const t = setInterval(check, 30000);
     return () => clearInterval(t);
   }, []);
 
@@ -36,10 +37,10 @@ export default function Sidebar() {
       <div className="p-5 border-b border-border">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-accent/20 flex items-center justify-center text-accent text-sm font-bold">
-            JH
+            GH
           </div>
           <div>
-            <div className="text-text font-bold text-sm leading-none">JobHunt AI</div>
+            <div className="text-text font-bold text-sm leading-none">GetHired AI</div>
             <div className="text-muted text-[10px] mt-0.5">Agentic platform</div>
           </div>
         </div>
@@ -79,9 +80,11 @@ export default function Sidebar() {
             {dbOk === null ? "Connecting…" : dbOk ? "DB connected" : "DB offline"}
           </span>
         </div>
-        <div className="text-[10px] text-muted truncate" title="tecmaths4mumbai@gmail.com">
-          tecmaths4mumbai@gmail.com
-        </div>
+        {userEmail && (
+          <div className="text-[10px] text-muted truncate" title={userEmail}>
+            {userEmail}
+          </div>
+        )}
       </div>
     </aside>
   );

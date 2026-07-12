@@ -56,7 +56,6 @@ class Checkpoint(BaseModel):
     user_id: str | None = None
     planned_diff: str | None = None
     status: str = "pending"
-    expires_at: datetime | None = None
     created_at: datetime | None = None
 
 
@@ -128,7 +127,6 @@ class User(BaseModel):
     email: str
     match_threshold: float = 0.6
     top_n: int = 5
-    timeout_minutes: int = 30
     max_compiler_retries: int = 3
     max_resume_versions: int = 3
     max_semantic_distance: float = 0.8

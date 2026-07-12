@@ -21,10 +21,20 @@ _groq_client: AsyncGroq | None = None
 
 
 def get_client() -> genai.Client:
-    """Return the shared genai client (creates it on first use)."""
+    """Return the shared genai client (creates it on first use).
+
+    Without an explicit timeout, a hung TCP handshake (observed here as an
+    IPv6 SYN that never completes) blocks forever — and since embeddings
+    calls run synchronously on the worker's single event loop thread, that
+    hang freezes every other queued job too. 30s is generous for a single
+    embed/generate call but still bounded.
+    """
     global _client
     if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key)
+        _client = genai.Client(
+            api_key=settings.gemini_api_key,
+            http_options=genai.types.HttpOptions(timeout=30_000),
+        )
     return _client
 
 

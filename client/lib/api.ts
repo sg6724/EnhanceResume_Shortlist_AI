@@ -19,6 +19,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export interface HealthResponse {
   status: string;
   db: boolean;
+  user_email: string;
 }
 
 export interface Stats {
@@ -60,8 +61,7 @@ export interface Checkpoint {
   id: string;
   jd_id: string;
   planned_diff: string;
-  status: "pending" | "approved" | "rejected" | "timed_out";
-  expires_at: string;
+  status: "pending" | "approved" | "rejected";
   created_at: string;
   scraped_jds: { company: string; title: string };
 }

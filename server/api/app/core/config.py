@@ -17,7 +17,7 @@ class LlmSettings(BaseModel):
 
 class EmailSettings(BaseModel):
     resend_api_key: str = ""
-    resend_from: str = "noreply@jobhunt.ai"
+    resend_from: str = "noreply@gethired.ai"
 
 
 class ContactsSettings(BaseModel):
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     groq_api_key: str = ""
     resend_api_key: str = ""
-    resend_from: str = "noreply@jobhunt.ai"
+    resend_from: str = "noreply@gethired.ai"
     hunter_api_key: str = ""
     apollo_api_key: str = ""
 

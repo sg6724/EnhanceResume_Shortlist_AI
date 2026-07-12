@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from ..config import settings
@@ -21,7 +22,10 @@ async def compute_match(
     Returns {keyword_score, semantic_score, llm_score, composite_score, gap_analysis}.
     """
     kw_score = compute_bm25_score(jd_text, resume_plain_text)
-    sem_score = compute_semantic_score(jd_text, resume_plain_text)
+    # compute_semantic_score makes a synchronous (blocking) network call to the
+    # Gemini embeddings API. Run it off the event loop thread so a slow/hung
+    # request stalls only this task, not every other queued job on the worker.
+    sem_score = await asyncio.to_thread(compute_semantic_score, jd_text, resume_plain_text)
 
     llm_score = 0.5
     gap_analysis = (

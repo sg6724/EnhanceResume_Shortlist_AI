@@ -113,7 +113,7 @@ export default function ResumePage() {
           <CardTitle>Rules the agents follow</CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted space-y-1.5">
-          <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\\begin{"{}"}...\\end{"{}"}</code> blocks</div>
+          <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\begin{"{}"}...\end{"{}"}</code> blocks</div>
           <div>• Never add or delete LaTeX environments</div>
           <div>• Never modify your preamble or packages</div>
           <div>• Return the full .tex + a diff of every change made</div>
