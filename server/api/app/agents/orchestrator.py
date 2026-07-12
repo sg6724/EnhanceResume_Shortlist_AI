@@ -368,4 +368,9 @@ async def run_manual_match(jd_id: str, sb: AsyncClient, http: httpx.AsyncClient)
             await _log(sb, jd_id, "compiler", f"PDF storage upload failed (non-fatal): {e}")
     await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
 
+    if pdf_bytes:
+        await _log(sb, jd_id, "compiler", f"PDF compiled successfully ({len(pdf_bytes):,} bytes)")
+    else:
+        await _log(sb, jd_id, "compiler", f"FAILED after all retries", error_log[:1000])
+
     return {"jd_id": jd_id, "match_id": match_id, "copy_id": copy_id, "status": status}
