@@ -11,6 +11,7 @@ const NAV = [
   { href: "/resume", label: "Master Resume", icon: "📄" },
   { href: "/matches", label: "Job Matches", icon: "🔍" },
   { href: "/checkpoints", label: "Checkpoints", icon: "✅" },
+  { href: "/outreach", label: "Outreach", icon: "✉️" },
   { href: "/copies", label: "Resume Copies", icon: "📋" },
   { href: "/traces", label: "Observability", icon: "🔭" },
 ];

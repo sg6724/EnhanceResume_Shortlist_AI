@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import AsyncClient, acreate_client
 
 from .config import settings
+from .core.container import build_container
 from .routers import compile as compile_router
 from .routers import (
     health,
@@ -25,6 +26,7 @@ from .routers import (
     copies,
     checkpoints,
     traces,
+    outreach,
 )
 
 
@@ -35,6 +37,7 @@ async def lifespan(app: FastAPI):
         settings.supabase_service_key,
     )
     app.state.http = httpx.AsyncClient(timeout=130.0)
+    app.state.container = build_container(settings, app.state.supabase, app.state.http)
 
     # Open Procrastinate only when DATABASE_URL is a real configured value
     if settings.database_url and "[YOUR-PASSWORD]" not in settings.database_url:
@@ -70,3 +73,4 @@ app.include_router(matches.router)
 app.include_router(copies.router)
 app.include_router(checkpoints.router)
 app.include_router(traces.router)
+app.include_router(outreach.router)

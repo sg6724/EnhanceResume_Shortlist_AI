@@ -12,7 +12,21 @@ def _make_connector() -> PsycopgConnector:
         return PsycopgConnector()
     # Strip SQLAlchemy dialect prefix; psycopg needs plain postgresql://
     dsn = db_url.replace("postgresql+asyncpg://", "postgresql://")
-    return PsycopgConnector(conninfo=dsn)
+    # Supabase's transaction-mode pooler (port 6543) multiplexes many client
+    # sessions onto shared server connections, so server-side prepared statements
+    # collide across transactions ("prepared statement _pg3_0 already exists").
+    # Disable psycopg3's auto-prepare so it uses the simple/extended protocol
+    # without naming statements. `kwargs` is forwarded to each pool connection's
+    # psycopg.connect().
+    # Keep the pool small: Supabase's pooler caps concurrent client connections,
+    # and BOTH the API and the worker open their own pool. A large default
+    # (min_size=4 each) can exhaust the cap and make pool init time out.
+    return PsycopgConnector(
+        conninfo=dsn,
+        kwargs={"prepare_threshold": None},
+        min_size=1,
+        max_size=4,
+    )
 
 
 proc_app = App(
@@ -49,3 +63,57 @@ async def rewrite_resume_task(checkpoint_id: str) -> None:
         print(f"[task:rewrite] {result}")
     finally:
         await http.aclose()
+
+
+@proc_app.task(name="run_outreach", queue="default", retry=1)
+async def run_outreach_task(user_id: str) -> None:
+    import httpx
+    from supabase import acreate_client
+    from .agents.outreach_orchestrator import run_outreach_cycle
+
+    sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    http = httpx.AsyncClient(timeout=60.0)
+    try:
+        result = await run_outreach_cycle(user_id, sb, http)
+        print(f"[task:outreach] {result}")
+    finally:
+        await http.aclose()
+
+
+@proc_app.task(name="send_outreach_email", queue="default", retry=1)
+async def send_outreach_email_task(draft_id: str) -> None:
+    import httpx
+    from supabase import acreate_client
+    from .agents.outreach_orchestrator import send_outreach
+
+    sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    http = httpx.AsyncClient(timeout=130.0)
+    try:
+        result = await send_outreach(draft_id, sb, http)
+        print(f"[task:outreach_send] {result}")
+    finally:
+        await http.aclose()
+
+
+@proc_app.periodic(cron="0 * * * *")
+@proc_app.task(name="outreach_tick", queue="default")
+async def outreach_tick(timestamp: int) -> None:
+    """Hourly tick: run an outreach cycle for each user whose interval elapsed."""
+    from datetime import datetime, timedelta, timezone
+    from supabase import acreate_client
+
+    sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    users = await sb.table("users").select(
+        "id, outreach_enabled, outreach_interval_hours, outreach_last_run_at"
+    ).execute()
+    now = datetime.now(timezone.utc)
+    for u in users.data:
+        if not u.get("outreach_enabled", True):
+            continue
+        last = u.get("outreach_last_run_at")
+        if last:
+            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+            if now - last_dt < timedelta(hours=u.get("outreach_interval_hours", 24)):
+                continue
+        await run_outreach_task.defer_async(user_id=u["id"])
+        print(f"[tick:outreach] queued cycle for {u['id']}")

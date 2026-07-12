@@ -88,6 +88,44 @@ export interface Trace {
   created_at: string;
 }
 
+export interface OutreachTarget {
+  id: string;
+  company_name: string;
+  company_domain: string | null;
+  source: "pipeline" | "watchlist";
+  jd_id: string | null;
+  role_title: string | null;
+  status:
+    | "pending" | "contact_found" | "contact_not_found"
+    | "drafted" | "approved" | "sent" | "failed" | "skipped";
+  founder_name: string | null;
+  founder_title: string | null;
+  founder_email: string | null;
+  email_confidence: "verified" | "guessed" | null;
+  contact_method: string | null;
+  failure_reason: string | null;
+  created_at: string;
+}
+
+export interface OutreachDraft {
+  id: string;
+  target_id: string;
+  subject: string;
+  body: string;
+  edited_subject: string | null;
+  edited_body: string | null;
+  resume_copy_id: string | null;
+  sent_at: string | null;
+  send_error: string | null;
+  created_at: string;
+  outreach_targets: OutreachTarget;
+}
+
+export interface OutreachQuota {
+  hunter_remaining: number;
+  hunter_limit: number;
+}
+
 export interface MasterResumeUploadResult {
   id: string;
   version: number;
@@ -150,4 +188,32 @@ export const api = {
   // Traces
   traces: (jdId?: string) =>
     req<Trace[]>(`/traces${jdId ? `?jd_id=${encodeURIComponent(jdId)}` : ""}`),
+
+  // Outreach
+  outreachTargets: () => req<OutreachTarget[]>("/outreach/targets"),
+  addWatchlist: (company_name: string, company_domain?: string) =>
+    req<OutreachTarget>("/outreach/watchlist", {
+      method: "POST",
+      body: JSON.stringify({ company_name, company_domain: company_domain || null }),
+    }),
+  patchTarget: (id: string, patch: Partial<Pick<OutreachTarget,
+    "founder_name" | "founder_title" | "founder_email">> & { retry?: boolean }) =>
+    req<OutreachTarget>(`/outreach/targets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  deleteTarget: (id: string) =>
+    req<{ deleted: string }>(`/outreach/targets/${id}`, { method: "DELETE" }),
+  outreachDrafts: () => req<OutreachDraft[]>("/outreach/drafts"),
+  patchDraft: (id: string, subject?: string, body?: string) =>
+    req<OutreachDraft>(`/outreach/drafts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ subject, body }),
+    }),
+  approveDraft: (id: string) =>
+    req<{ queued: boolean }>(`/outreach/drafts/${id}/approve`, { method: "POST" }),
+  rejectDraft: (id: string) =>
+    req<{ status: string }>(`/outreach/drafts/${id}/reject`, { method: "POST" }),
+  runOutreach: () => req<{ queued: boolean }>("/outreach/run", { method: "POST" }),
+  outreachQuota: () => req<OutreachQuota>("/outreach/quota"),
 };
