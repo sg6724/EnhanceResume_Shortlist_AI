@@ -133,6 +133,19 @@ export interface MasterResumeUploadResult {
   plain_text_chars: number;
 }
 
+export interface QuickMatchFetchResult {
+  company: string;
+  title: string;
+  jd_text: string;
+  source: "jsonld" | "llm_extracted";
+  possibly_closed: boolean;
+}
+
+export interface QuickMatchStatus {
+  match: JdMatch | null;
+  copy: ResumeCopy | null;
+}
+
 // ── API client ─────────────────────────────────────────────────────────────
 
 export const api = {
@@ -217,4 +230,18 @@ export const api = {
     req<{ status: string }>(`/outreach/drafts/${id}/reject`, { method: "POST" }),
   runOutreach: () => req<{ queued: boolean }>("/outreach/run", { method: "POST" }),
   outreachQuota: () => req<OutreachQuota>("/outreach/quota"),
+
+  // Quick Match
+  quickMatchFetchUrl: (url: string) =>
+    req<QuickMatchFetchResult>("/quick-match/fetch-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  quickMatchSubmit: (jd_text: string, company: string, title: string) =>
+    req<{ jd_id: string; queued: boolean }>("/quick-match", {
+      method: "POST",
+      body: JSON.stringify({ jd_text, company, title }),
+    }),
+  quickMatchStatus: (jdId: string) =>
+    req<QuickMatchStatus>(`/quick-match/${jdId}`),
 };
