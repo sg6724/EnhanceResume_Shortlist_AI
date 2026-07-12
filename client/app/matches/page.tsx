@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, type JdMatch } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
 import clsx from "clsx";
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
@@ -39,13 +41,11 @@ export default function MatchesPage() {
   }, []);
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Job Matches</h1>
-        <p className="text-muted text-sm mt-1">
-          JDs ranked by composite match score (BM25 30% + semantic 30% + Gemini LLM 40%).
-        </p>
-      </div>
+    <div className="max-w-3xl space-y-8">
+      <PageHeader
+        title="Job Matches"
+        description="JDs ranked by composite match score (BM25 30% + semantic 30% + Gemini LLM 40%)."
+      />
 
       {loading && (
         <div className="text-center py-16 text-muted text-sm animate-pulse">Loading matches…</div>
@@ -53,7 +53,6 @@ export default function MatchesPage() {
 
       {!loading && matches.length === 0 && (
         <div className="text-center py-16 text-muted text-sm">
-          <div className="text-4xl mb-3">🔍</div>
           No matches yet. Run a scraping batch from the{" "}
           <a href="/" className="text-accent hover:underline">Dashboard</a>.
         </div>
@@ -61,10 +60,7 @@ export default function MatchesPage() {
 
       <div className="space-y-4">
         {matches.map((m) => (
-          <div
-            key={m.id}
-            className="bg-panel border border-border rounded-xl p-5 space-y-4"
-          >
+          <Card key={m.id} className="p-5 space-y-4">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
@@ -73,17 +69,13 @@ export default function MatchesPage() {
                 </div>
                 <div className="text-muted text-sm mt-0.5">
                   {m.scraped_jds?.company ?? "Unknown"}{" "}
-                  {m.scraped_jds?.location && (
-                    <span>· {m.scraped_jds.location}</span>
-                  )}
+                  {m.scraped_jds?.location && <span>· {m.scraped_jds.location}</span>}
                 </div>
                 <div className="flex items-center gap-2 mt-1.5">
                   <span className="text-[10px] text-muted bg-border px-2 py-0.5 rounded-full uppercase tracking-wide">
                     {m.scraped_jds?.source ?? "?"}
                   </span>
-                  <span className="text-[10px] text-muted">
-                    {m.position_context}
-                  </span>
+                  <span className="text-[10px] text-muted">{m.position_context}</span>
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
@@ -130,7 +122,7 @@ export default function MatchesPage() {
                 View original JD →
               </a>
             )}
-          </div>
+          </Card>
         ))}
       </div>
     </div>
