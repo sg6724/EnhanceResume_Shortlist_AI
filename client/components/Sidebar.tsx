@@ -10,6 +10,7 @@ const NAV = [
   { href: "/positions", label: "Positions" },
   { href: "/resume", label: "Master Resume" },
   { href: "/matches", label: "Job Matches" },
+  { href: "/quick-match", label: "Quick Match" },
   { href: "/checkpoints", label: "Checkpoints" },
   { href: "/outreach", label: "Outreach" },
   { href: "/copies", label: "Resume Copies" },
