@@ -6,7 +6,7 @@ import re
 import httpx
 
 from ..config import settings
-from ..services.llm import get_client
+from ..services.llm import generate
 from ..services.hunter import (
     hunter_domain_search,
     hunter_quota_remaining,
@@ -21,6 +21,7 @@ _COMPANY_SUFFIX_RE = re.compile(
 )
 _TEAM_PATHS = ["/about", "/team", "/about-us", "/company"]
 _MODEL = "gemini-2.5-flash"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
 def candidate_domains(company_name: str) -> list[str]:
@@ -98,8 +99,9 @@ async def _scrape_team_pages(http: httpx.AsyncClient, domain: str) -> str:
 
 
 async def _extract_leaders(page_text: str, company_name: str) -> list[dict]:
-    """Gemini 2.5 Flash: extract [{name, title}] leadership from page text."""
-    if not settings.gemini_api_key or not page_text.strip():
+    """Gemini 2.5 Flash (Groq fallback): extract [{name, title}] leadership from page text."""
+    no_provider = not settings.gemini_api_key and not settings.groq_api_key
+    if no_provider or not page_text.strip():
         return []
     prompt = f"""Extract the technical leadership of "{company_name}" from this website text.
 Only include people whose title is CTO, founder, co-founder, chief technology officer,
@@ -112,8 +114,8 @@ Answer in valid JSON only, no markdown fences:
 {{"people": [{{"name": "Full Name", "title": "their title"}}]}}
 If none found, return {{"people": []}}."""
     try:
-        resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
-        text = resp.text.strip().strip("```json").strip("```").strip()
+        raw = await generate(prompt, gemini_model=_MODEL, groq_model=_GROQ_MODEL)
+        text = raw.strip().strip("```json").strip("```").strip()
         people = json.loads(text).get("people", [])
         return [p for p in people if p.get("name") and LEADER_TITLE_RE.search(p.get("title", ""))]
     except Exception as e:
