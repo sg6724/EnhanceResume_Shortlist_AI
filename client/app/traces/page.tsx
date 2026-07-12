@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, type Trace } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
 import clsx from "clsx";
 
 const AGENT_STYLE: Record<string, string> = {
   orchestrator: "bg-accent/10 text-accent border-accent/20",
   scraper:      "bg-ok/10 text-ok border-ok/20",
   filter:       "bg-warn/10 text-warn border-warn/20",
-  matcher:      "bg-purple-400/10 text-purple-400 border-purple-400/20",
-  rewriter:     "bg-pink-400/10 text-pink-400 border-pink-400/20",
+  matcher:      "bg-violet/10 text-violet border-violet/20",
+  rewriter:     "bg-teal/10 text-teal border-teal/20",
   compiler:     "bg-bad/10 text-bad border-bad/20",
 };
 
@@ -41,13 +43,11 @@ export default function TracesPage() {
   }, []);
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Observability</h1>
-        <p className="text-muted text-sm mt-1">
-          Real-time agent trace log. Auto-refreshes every 5 s.
-        </p>
-      </div>
+    <div className="max-w-4xl space-y-8">
+      <PageHeader
+        title="Observability"
+        description="Real-time agent trace log. Auto-refreshes every 5 s."
+      />
 
       {/* Legend */}
       <div className="flex flex-wrap gap-2">
@@ -67,7 +67,6 @@ export default function TracesPage() {
 
       {!loading && traces.length === 0 && (
         <div className="text-center py-16 text-muted text-sm">
-          <div className="text-4xl mb-3">🔭</div>
           No traces yet. Run the pipeline to see agent activity here.
         </div>
       )}
@@ -76,10 +75,7 @@ export default function TracesPage() {
         {traces.map((t) => {
           const isOpen = expanded === t.id;
           return (
-            <div
-              key={t.id}
-              className="bg-panel border border-border rounded-xl overflow-hidden"
-            >
+            <Card key={t.id} className="overflow-hidden">
               <button
                 onClick={() => setExpanded(isOpen ? null : t.id)}
                 className="w-full text-left px-4 py-3 flex items-center gap-3"
@@ -89,9 +85,7 @@ export default function TracesPage() {
                 <span className="text-[10px] text-muted flex-shrink-0">
                   {new Date(t.created_at).toLocaleTimeString()}
                 </span>
-                <span className="text-muted text-xs">
-                  {isOpen ? "▲" : "▼"}
-                </span>
+                <span className="text-muted text-xs">{isOpen ? "▲" : "▼"}</span>
               </button>
               {isOpen && t.reasoning && (
                 <div className="px-4 pb-4">
@@ -100,7 +94,7 @@ export default function TracesPage() {
                   </pre>
                 </div>
               )}
-            </div>
+            </Card>
           );
         })}
       </div>
