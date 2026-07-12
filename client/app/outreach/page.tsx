@@ -2,9 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, OutreachDraft, OutreachTarget, OutreachQuota } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge, type Tone } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { Label } from "@/components/ui/Label";
 
 const STATUS_TONE: Record<string, Tone> = {
   pending: "muted",
@@ -32,54 +35,58 @@ function DraftCard({ draft, onDone }: { draft: OutreachDraft; onDone: () => void
   };
 
   return (
-    <Card className="p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+    <Card>
+      <CardHeader className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <div className="text-text font-semibold text-sm">{t.company_name}</div>
-          <div className="text-muted text-xs">
+          <CardTitle>{t.company_name}</CardTitle>
+          <CardDescription>
             {t.founder_name} — {t.founder_title} ·{" "}
             <span className="text-text">{t.founder_email}</span>{" "}
             {t.email_confidence === "verified"
               ? <span className="text-ok">verified</span>
               : <span className="text-bad" title="Pattern-guessed email — delivery not guaranteed">guessed</span>}
-          </div>
-          {t.role_title && <div className="text-muted text-xs">Role: {t.role_title}</div>}
+            {t.role_title && <> · Role: {t.role_title}</>}
+          </CardDescription>
         </div>
         <div className="text-[11px] text-muted">
           {draft.resume_copy_id ? "Tailored resume PDF attached" : "Master resume PDF attached"}
         </div>
-      </div>
-      <input
-        value={subject}
-        onChange={(e) => setSubject(e.target.value)}
-        className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text"
-        placeholder="Subject"
-      />
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={8}
-        className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text font-mono"
-      />
-      {draft.send_error && <div className="text-bad text-xs">Last send failed: {draft.send_error}</div>}
-      {err && <div className="text-bad text-xs">{err}</div>}
-      <div className="flex gap-2">
-        {dirty && (
-          <Button variant="secondary" disabled={busy}
-            onClick={() => act(() => api.patchDraft(draft.id, subject, body))}>
-            Save edits
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor={`subject-${draft.id}`}>Subject</Label>
+          <Input id={`subject-${draft.id}`} value={subject} onChange={(e) => setSubject(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`body-${draft.id}`}>Body</Label>
+          <Textarea
+            id={`body-${draft.id}`}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={8}
+            className="font-mono"
+          />
+        </div>
+        {draft.send_error && <div className="text-bad text-xs">Last send failed: {draft.send_error}</div>}
+        {err && <div className="text-bad text-xs">{err}</div>}
+        <div className="flex gap-2">
+          {dirty && (
+            <Button variant="secondary" disabled={busy}
+              onClick={() => act(() => api.patchDraft(draft.id, subject, body))}>
+              Save edits
+            </Button>
+          )}
+          <Button variant="ok" disabled={busy || dirty}
+            title={dirty ? "Save edits first" : undefined}
+            onClick={() => act(() => api.approveDraft(draft.id))}>
+            {draft.send_error ? "Retry send" : "Approve & Send"}
           </Button>
-        )}
-        <Button variant="ok" disabled={busy || dirty}
-          title={dirty ? "Save edits first" : undefined}
-          onClick={() => act(() => api.approveDraft(draft.id))}>
-          {draft.send_error ? "Retry send" : "Approve & Send"}
-        </Button>
-        <Button variant="danger" disabled={busy}
-          onClick={() => act(() => api.rejectDraft(draft.id))}>
-          Reject
-        </Button>
-      </div>
+          <Button variant="danger" disabled={busy}
+            onClick={() => act(() => api.rejectDraft(draft.id))}>
+            Reject
+          </Button>
+        </div>
+      </CardContent>
     </Card>
   );
 }
@@ -135,12 +142,10 @@ export default function OutreachPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-text">Company watchlist</h2>
         <div className="flex gap-2 flex-wrap">
-          <input value={company} onChange={(e) => setCompany(e.target.value)}
-            placeholder="Company name"
-            className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text" />
-          <input value={domain} onChange={(e) => setDomain(e.target.value)}
-            placeholder="Domain (optional)"
-            className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text" />
+          <Input value={company} onChange={(e) => setCompany(e.target.value)}
+            placeholder="Company name" className="w-auto" />
+          <Input value={domain} onChange={(e) => setDomain(e.target.value)}
+            placeholder="Domain (optional)" className="w-auto" />
           <Button variant="secondary" onClick={add}>Add company</Button>
         </div>
         <Card className="divide-y divide-border">
