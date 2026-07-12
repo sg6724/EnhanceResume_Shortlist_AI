@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 
 from ..config import settings
-from ..services.llm import get_client
+from ..services.llm import generate
 
 _MODEL = "gemini-2.5-flash"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 BANNED_PHRASES = [
     "i hope this email finds you well",
@@ -42,9 +43,9 @@ async def write_letter(
     founder_title: str,
     company_name: str,
 ) -> tuple[str, str]:
-    """Gemini 2.5 Flash drafts a direct cover-letter email. Returns (subject, body)."""
-    if not settings.gemini_api_key:
-        raise ValueError("GEMINI_API_KEY not configured")
+    """Gemini 2.5 Flash (Groq fallback) drafts a direct cover-letter email. Returns (subject, body)."""
+    if not settings.gemini_api_key and not settings.groq_api_key:
+        raise ValueError("GEMINI_API_KEY or GROQ_API_KEY not configured")
 
     jd_block = f"Job description:\n{jd_text[:3000]}" if jd_text.strip() else \
         "No job description available — pitch for the role title directly."
@@ -70,8 +71,8 @@ Rules:
 
 Answer in valid JSON only, no markdown fences:
 {{"subject": "...", "body": "..."}}"""
-        resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
-        text = resp.text.strip().strip("```json").strip("```").strip()
+        raw = await generate(prompt, gemini_model=_MODEL, groq_model=_GROQ_MODEL)
+        text = raw.strip().strip("```json").strip("```").strip()
         try:
             data = json.loads(text)
         except json.JSONDecodeError as e:
