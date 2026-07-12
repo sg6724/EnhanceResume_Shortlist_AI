@@ -1,29 +1,46 @@
-import clsx from "clsx";
-import type { ButtonHTMLAttributes } from "react";
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ok" | "danger" | "ghost";
+const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap font-semibold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:pointer-events-none",
+  {
+    variants: {
+      variant: {
+        primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_24px_rgba(110,168,254,0.35)]",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ok: "bg-[#34d399] text-primary-foreground hover:bg-[#34d399]/90 shadow-[0_0_24px_rgba(52,211,153,0.3)]",
+        danger: "bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20",
+        ghost: "text-muted hover:text-foreground hover:bg-white/[0.04]",
+      },
+      pill: {
+        true: "rounded-full px-6 py-2.5",
+        false: "rounded-lg px-4 py-2",
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      pill: false,
+    },
+  }
+);
 
-export function Button({
-  variant = "primary", pill = false, className, children, ...props
-}: {
-  variant?: Variant; pill?: boolean; className?: string;
-} & ButtonHTMLAttributes<HTMLButtonElement>) {
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+function Button({ className, variant, pill, asChild = false, ...props }: ButtonProps) {
+  const Comp = asChild ? Slot : "button";
   return (
-    <button
-      className={clsx(
-        "font-semibold text-sm transition-all active:scale-95",
-        "disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100",
-        pill ? "rounded-full px-6 py-2.5" : "rounded-lg px-4 py-2",
-        variant === "primary" && "bg-accent text-bg hover:bg-accent/90 shadow-[0_0_24px_rgba(110,168,254,0.35)]",
-        variant === "secondary" && "bg-white/[0.06] text-text hover:bg-white/[0.1]",
-        variant === "ok" && "bg-ok text-bg hover:bg-ok/90 shadow-[0_0_24px_rgba(52,211,153,0.3)]",
-        variant === "danger" && "bg-bad/10 text-bad border border-bad/30 hover:bg-bad/20",
-        variant === "ghost" && "text-muted hover:text-text",
-        className
-      )}
+    <Comp
+      data-slot="button"
+      className={cn(buttonVariants({ variant, pill }), className)}
       {...props}
-    >
-      {children}
-    </button>
+    />
   );
 }
+
+export { Button, buttonVariants };
