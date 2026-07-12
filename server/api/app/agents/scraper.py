@@ -127,7 +127,7 @@ async def _fetch_adzuna(keywords: list[str]) -> list[dict[str, Any]]:
     return results
 
 
-def _dedup_hash(company: str, title: str, location: str) -> str:
+def dedup_hash(company: str, title: str, location: str) -> str:
     key = f"{company}|{title}|{location}".lower().strip()
     return hashlib.sha256(key.encode()).hexdigest()
 
@@ -144,7 +144,7 @@ async def scrape_jds(keywords: list[str]) -> list[dict[str, Any]]:
     seen: set[str] = set()
     valid: list[dict[str, Any]] = []
     for job in raw:
-        h = _dedup_hash(job["company"], job["title"], job.get("location", ""))
+        h = dedup_hash(job["company"], job["title"], job.get("location", ""))
         if h in seen:
             continue
         seen.add(h)
