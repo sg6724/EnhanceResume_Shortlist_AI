@@ -4,17 +4,23 @@ from ..config import settings
 
 
 def send_notification(to: str, subject: str, html: str) -> None:
+    """Best-effort user notification. Never raises — a misconfigured/unverified
+    Resend domain or transient send error must not abort the caller (e.g. the
+    scrape pipeline)."""
     if not settings.resend_api_key:
         print(f"[email skip — no RESEND_API_KEY] To: {to} | Subject: {subject}")
         return
     import resend
     resend.api_key = settings.resend_api_key
-    resend.Emails.send({
-        "from": settings.resend_from,
-        "to": [to],
-        "subject": subject,
-        "html": html,
-    })
+    try:
+        resend.Emails.send({
+            "from": settings.resend_from,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        })
+    except Exception as e:
+        print(f"[email FAILED — non-fatal] To: {to} | Subject: {subject} | {e}")
 
 
 def notify_batch_complete(to: str, match_count: int, zero_matches: bool = False) -> None:

@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import json
 
-from google import genai
-
 from ..config import settings
+from ..services.llm import get_client
 
-_MODEL = "gemini-2.0-flash"
-
-
-def _client() -> genai.Client:
-    return genai.Client(api_key=settings.gemini_api_key)
+# gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
+# The filter is a cheap, high-volume gate, so use the lite model.
+_MODEL = "gemini-2.5-flash-lite"
 
 
 async def is_jd_relevant(jd_text: str, target_titles: list[str]) -> tuple[bool, str]:
@@ -36,7 +33,7 @@ A JD is relevant if the core role aligns with at least one target position.
 A JD is NOT relevant if the role is fundamentally different (e.g., Sales Manager vs AI Engineer).
 """
     try:
-        resp = _client().models.generate_content(model=_MODEL, contents=prompt)
+        resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
         text = resp.text.strip().strip("```json").strip("```").strip()
         data = json.loads(text)
         return bool(data.get("relevant", True)), data.get("reason", "")

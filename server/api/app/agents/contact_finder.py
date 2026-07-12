@@ -4,9 +4,9 @@ import json
 import re
 
 import httpx
-from google import genai
 
 from ..config import settings
+from ..services.llm import get_client
 from ..services.hunter import (
     hunter_domain_search,
     hunter_quota_remaining,
@@ -21,10 +21,6 @@ _COMPANY_SUFFIX_RE = re.compile(
 )
 _TEAM_PATHS = ["/about", "/team", "/about-us", "/company"]
 _MODEL = "gemini-2.5-flash"
-
-
-def _client() -> genai.Client:
-    return genai.Client(api_key=settings.gemini_api_key)
 
 
 def candidate_domains(company_name: str) -> list[str]:
@@ -116,7 +112,7 @@ Answer in valid JSON only, no markdown fences:
 {{"people": [{{"name": "Full Name", "title": "their title"}}]}}
 If none found, return {{"people": []}}."""
     try:
-        resp = _client().models.generate_content(model=_MODEL, contents=prompt)
+        resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
         text = resp.text.strip().strip("```json").strip("```").strip()
         people = json.loads(text).get("people", [])
         return [p for p in people if p.get("name") and LEADER_TITLE_RE.search(p.get("title", ""))]

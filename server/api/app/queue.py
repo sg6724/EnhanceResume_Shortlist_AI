@@ -12,7 +12,21 @@ def _make_connector() -> PsycopgConnector:
         return PsycopgConnector()
     # Strip SQLAlchemy dialect prefix; psycopg needs plain postgresql://
     dsn = db_url.replace("postgresql+asyncpg://", "postgresql://")
-    return PsycopgConnector(conninfo=dsn)
+    # Supabase's transaction-mode pooler (port 6543) multiplexes many client
+    # sessions onto shared server connections, so server-side prepared statements
+    # collide across transactions ("prepared statement _pg3_0 already exists").
+    # Disable psycopg3's auto-prepare so it uses the simple/extended protocol
+    # without naming statements. `kwargs` is forwarded to each pool connection's
+    # psycopg.connect().
+    # Keep the pool small: Supabase's pooler caps concurrent client connections,
+    # and BOTH the API and the worker open their own pool. A large default
+    # (min_size=4 each) can exhaust the cap and make pool init time out.
+    return PsycopgConnector(
+        conninfo=dsn,
+        kwargs={"prepare_threshold": None},
+        min_size=1,
+        max_size=4,
+    )
 
 
 proc_app = App(

@@ -2,49 +2,90 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 from typing import Any
 
 import aiohttp
 
 from ..config import settings
 
+# Max candidate JDs kept after dedup/validation. Each candidate later costs
+# several (free-tier, rate-limited) Gemini calls in the filter+match stages,
+# so keep the pool small.
+MAX_CANDIDATES = 20
+
+# Generic role words that are useless as RemoteOK tags — tag=engineer pulls a
+# huge, mostly-irrelevant pool. We drop these when a more specific token exists.
+_GENERIC_ROLE_TOKENS = {
+    "engineer", "engineering", "developer", "dev", "scientist", "analyst",
+    "specialist", "manager", "lead", "senior", "junior", "staff", "principal",
+    "sr", "jr", "intern", "the", "of", "and", "a", "an",
+}
+
+
+def _tokens(text: str) -> list[str]:
+    return [w for w in re.split(r"[^a-z0-9]+", text.lower()) if w]
+
+
+def _remoteok_tags(keywords: list[str], limit: int = 5) -> list[str]:
+    """RemoteOK uses short single-word tags (e.g. 'ai', 'ml'), so expand each
+    keyword into candidate tags: its hyphen-slug plus each specific (non-generic)
+    token. Unknown tags simply return no jobs and are harmless."""
+    tags: list[str] = []
+    seen: set[str] = set()
+    for kw in keywords:
+        toks = _tokens(kw)
+        if not toks:
+            continue
+        candidates = ["-".join(toks)] + [t for t in toks if t not in _GENERIC_ROLE_TOKENS]
+        for c in candidates:
+            if c and c not in seen:
+                seen.add(c)
+                tags.append(c)
+    return tags[:limit]
+
 
 async def _fetch_remoteok(keywords: list[str]) -> list[dict[str, Any]]:
     """RemoteOK public API — completely free, no auth required."""
     results: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
     async with aiohttp.ClientSession() as session:
-        for kw in keywords[:4]:
-            url = f"https://remoteok.com/api?tag={kw.replace(' ', '-').lower()}"
+        for tag in _remoteok_tags(keywords):
+            url = f"https://remoteok.com/api?tag={tag}"
             try:
                 async with session.get(
                     url,
                     headers={"User-Agent": "Mozilla/5.0 JobHuntBot/1.0"},
-                    timeout=aiohttp.ClientTimeout(total=15),
+                    timeout=aiohttp.ClientTimeout(total=20),
                 ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json(content_type=None)
-                        # First element is a legal notice dict, skip it
-                        for job in (data[1:] if isinstance(data, list) else []):
-                            if not isinstance(job, dict):
-                                continue
-                            desc = job.get("description") or job.get("tags") or ""
-                            if not desc:
-                                continue
-                            results.append({
-                                "source": "remoteok",
-                                "company": job.get("company", "Unknown"),
-                                "title": job.get("position", kw),
-                                "location": "Remote",
-                                "url": job.get("url", ""),
-                                "raw_text": (
-                                    f"{job.get('position', '')} at {job.get('company', '')}\n\n"
-                                    f"Tags: {', '.join(job.get('tags', []))}\n\n"
-                                    f"{desc}"
-                                ),
-                            })
+                    if resp.status != 200:
+                        continue
+                    data = await resp.json(content_type=None)
+                    # First element is a legal notice dict, skip it
+                    for job in (data[1:] if isinstance(data, list) else []):
+                        if not isinstance(job, dict) or "position" not in job:
+                            continue
+                        jid = str(job.get("id") or job.get("slug") or job.get("url"))
+                        if jid in seen_ids:
+                            continue
+                        seen_ids.add(jid)
+                        desc = job.get("description") or ""
+                        tags_list = job.get("tags") or []
+                        results.append({
+                            "source": "remoteok",
+                            "company": job.get("company", "Unknown"),
+                            "title": job.get("position", tag),
+                            "location": job.get("location") or "Remote",
+                            "url": job.get("url", ""),
+                            "raw_text": (
+                                f"{job.get('position', '')} at {job.get('company', '')}\n\n"
+                                f"Tags: {', '.join(tags_list)}\n\n"
+                                f"{desc}"
+                            ),
+                        })
             except Exception as e:
-                print(f"[scraper] RemoteOK error for '{kw}': {e}")
-            await asyncio.sleep(2)  # respect rate limits
+                print(f"[scraper] RemoteOK error for tag '{tag}': {e}")
+            await asyncio.sleep(1.5)  # respect rate limits
     return results
 
 
@@ -112,5 +153,16 @@ async def scrape_jds(keywords: list[str]) -> list[dict[str, Any]]:
         job["dedup_hash"] = h
         valid.append(job)
 
-    print(f"[scraper] {len(raw)} raw → {len(valid)} valid after dedup+validation")
-    return valid
+    # Rank by keyword relevance so the small candidate cap keeps the JDs most
+    # likely to matter (RemoteOK tag feeds include loosely-tagged noise).
+    kw_tokens = {t for kw in keywords for t in _tokens(kw)}
+
+    def _relevance(job: dict[str, Any]) -> int:
+        hay = (job.get("title", "") + " " + job.get("raw_text", "")[:600]).lower()
+        return sum(1 for t in kw_tokens if t and t in hay)
+
+    valid.sort(key=_relevance, reverse=True)
+    capped = valid[:MAX_CANDIDATES]
+
+    print(f"[scraper] {len(raw)} raw → {len(valid)} valid → {len(capped)} kept (cap {MAX_CANDIDATES})")
+    return capped

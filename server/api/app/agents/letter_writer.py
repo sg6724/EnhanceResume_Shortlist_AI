@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 
-from google import genai
-
 from ..config import settings
+from ..services.llm import get_client
 
 _MODEL = "gemini-2.5-flash"
 
@@ -17,10 +16,6 @@ BANNED_PHRASES = [
     "i am writing to express",
 ]
 MAX_WORDS = 220
-
-
-def _client() -> genai.Client:
-    return genai.Client(api_key=settings.gemini_api_key)
 
 
 def validate_letter(subject: str, body: str) -> str | None:
@@ -75,7 +70,7 @@ Rules:
 
 Answer in valid JSON only, no markdown fences:
 {{"subject": "...", "body": "..."}}"""
-        resp = _client().models.generate_content(model=_MODEL, contents=prompt)
+        resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
         text = resp.text.strip().strip("```json").strip("```").strip()
         try:
             data = json.loads(text)

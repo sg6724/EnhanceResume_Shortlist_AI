@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import re
 
-from google import genai
-
 from ..config import settings
+from ..services.llm import get_client
 
-_MODEL = "gemini-2.0-flash"
-
-
-def _client() -> genai.Client:
-    return genai.Client(api_key=settings.gemini_api_key)
+# gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
+# Rewriting LaTeX needs capability, so use the full flash model.
+_MODEL = "gemini-2.5-flash"
 
 
 def _extract_environments(tex: str) -> frozenset[str]:
@@ -62,7 +59,7 @@ Master resume (ONLY edit content inside existing environments):
 {master_tex}
 """
 
-    resp = _client().models.generate_content(model=_MODEL, contents=prompt)
+    resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
     full_response = resp.text
 
     # Split on "DIFF:" marker
