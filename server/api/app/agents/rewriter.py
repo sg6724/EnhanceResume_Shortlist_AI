@@ -3,11 +3,12 @@ from __future__ import annotations
 import re
 
 from ..config import settings
-from ..services.llm import get_client
+from ..services.llm import generate
 
 # gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
 # Rewriting LaTeX needs capability, so use the full flash model.
 _MODEL = "gemini-2.5-flash"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
 def _extract_environments(tex: str) -> frozenset[str]:
@@ -29,8 +30,8 @@ async def rewrite_resume(
     Raises ValueError if LaTeX environment structure was changed.
     Falls back to returning master unchanged if no API key.
     """
-    if not settings.gemini_api_key:
-        return master_tex, "No GEMINI_API_KEY — master returned unchanged"
+    if not settings.gemini_api_key and not settings.groq_api_key:
+        return master_tex, "No GEMINI_API_KEY or GROQ_API_KEY — master returned unchanged"
 
     error_context = (
         f"\n\nPrevious pdflatex compile error (attempt {attempt}):\n{previous_error[:1000]}"
@@ -59,8 +60,7 @@ Master resume (ONLY edit content inside existing environments):
 {master_tex}
 """
 
-    resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
-    full_response = resp.text
+    full_response = await generate(prompt, gemini_model=_MODEL, groq_model=_GROQ_MODEL)
 
     # Split on "DIFF:" marker
     if "DIFF:" in full_response:
