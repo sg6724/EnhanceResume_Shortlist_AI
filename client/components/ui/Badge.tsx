@@ -1,20 +1,37 @@
-import clsx from "clsx";
-import type { ReactNode } from "react";
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-export type Tone = "ok" | "bad" | "warn" | "accent" | "muted";
+const badgeVariants = cva(
+  "inline-flex items-center rounded-full text-[11px] px-2 py-0.5 font-medium w-fit",
+  {
+    variants: {
+      tone: {
+        ok: "bg-ok/15 text-ok",
+        bad: "bg-bad/15 text-bad",
+        warn: "bg-warn/15 text-warn",
+        accent: "bg-accent/15 text-accent",
+        muted: "bg-muted/15 text-muted",
+      },
+    },
+    defaultVariants: {
+      tone: "muted",
+    },
+  }
+);
 
-const TONE_STYLE: Record<Tone, string> = {
-  ok: "bg-ok/15 text-ok",
-  bad: "bg-bad/15 text-bad",
-  warn: "bg-warn/15 text-warn",
-  accent: "bg-accent/15 text-accent",
-  muted: "bg-muted/15 text-muted",
-};
+export type Tone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
 
-export function Badge({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
-  return (
-    <span className={clsx("text-[11px] px-2 py-0.5 rounded-full font-medium", TONE_STYLE[tone])}>
-      {children}
-    </span>
-  );
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {
+  asChild?: boolean;
 }
+
+function Badge({ className, tone, asChild = false, ...props }: BadgeProps) {
+  const Comp = asChild ? Slot : "span";
+  return <Comp data-slot="badge" className={cn(badgeVariants({ tone }), className)} {...props} />;
+}
+
+export { Badge, badgeVariants };
