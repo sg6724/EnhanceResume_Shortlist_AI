@@ -2,8 +2,10 @@
 import { useState } from "react";
 import { api, type MasterResumeUploadResult } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
+import { Label } from "@/components/ui/Label";
 
 const EXAMPLE_TEX = `\\documentclass[11pt,a4paper]{article}
 \\usepackage[margin=1in]{geometry}
@@ -59,11 +61,9 @@ export default function ResumePage() {
         description="Your LaTeX source of truth. Agents fork from this — they never modify it directly. Uploading a new version marks existing copies as stale."
       />
 
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-muted uppercase tracking-wider font-medium">
-            LaTeX Source (.tex)
-          </label>
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <Label htmlFor="tex-source">LaTeX Source (.tex)</Label>
           {!tex && (
             <button
               onClick={() => setTex(EXAMPLE_TEX)}
@@ -72,21 +72,24 @@ export default function ResumePage() {
               Load example
             </button>
           )}
-        </div>
-        <textarea
-          value={tex}
-          onChange={(e) => setTex(e.target.value)}
-          placeholder={EXAMPLE_TEX}
-          rows={22}
-          spellCheck={false}
-          className="w-full bg-bg border border-border rounded-lg px-4 py-3 text-sm font-mono text-text placeholder:text-muted/40 focus:outline-none focus:border-accent resize-none transition-colors"
-        />
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">{tex.length.toLocaleString()} chars</span>
-          <Button pill onClick={upload} disabled={uploading || !tex.trim()}>
-            {uploading ? "Uploading…" : "Upload Master Resume"}
-          </Button>
-        </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            id="tex-source"
+            value={tex}
+            onChange={(e) => setTex(e.target.value)}
+            placeholder={EXAMPLE_TEX}
+            rows={22}
+            spellCheck={false}
+            className="font-mono"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted">{tex.length.toLocaleString()} chars</span>
+            <Button pill onClick={upload} disabled={uploading || !tex.trim()}>
+              {uploading ? "Uploading…" : "Upload Master Resume"}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
 
       {result && (
@@ -105,12 +108,16 @@ export default function ResumePage() {
         </div>
       )}
 
-      <Card className="p-4 text-xs text-muted space-y-1.5">
-        <div className="font-semibold text-text text-sm mb-2">Rules the agents follow</div>
-        <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\\begin{"{}"}...\\end{"{}"}</code> blocks</div>
-        <div>• Never add or delete LaTeX environments</div>
-        <div>• Never modify your preamble or packages</div>
-        <div>• Return the full .tex + a diff of every change made</div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Rules the agents follow</CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-muted space-y-1.5">
+          <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\\begin{"{}"}...\\end{"{}"}</code> blocks</div>
+          <div>• Never add or delete LaTeX environments</div>
+          <div>• Never modify your preamble or packages</div>
+          <div>• Return the full .tex + a diff of every change made</div>
+        </CardContent>
       </Card>
     </div>
   );
