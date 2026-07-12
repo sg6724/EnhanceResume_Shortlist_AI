@@ -22,7 +22,7 @@ class SubmitIn(BaseModel):
 
 async def _get_user_id(sb, email: str) -> str:
     res = await sb.table("users").select("id").eq("email", email).maybe_single().execute()
-    if not res.data:
+    if not res or not res.data:
         raise HTTPException(404, "user not found")
     return res.data["id"]
 
@@ -80,7 +80,7 @@ async def submit(body: SubmitIn, request: Request):
 async def status(jd_id: str, request: Request):
     sb = request.app.state.supabase
     jd_res = await sb.table("scraped_jds").select("id").eq("id", jd_id).maybe_single().execute()
-    if not jd_res.data:
+    if not jd_res or not jd_res.data:
         raise HTTPException(404, "job not found")
 
     match_res = await (
