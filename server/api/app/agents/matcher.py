@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 
 from ..config import settings
-from ..services.llm import get_client
+from ..services.llm import generate
 from ..services.scoring import compute_bm25_score, compute_semantic_score
 
 # gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
 _MODEL = "gemini-2.5-flash"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
 async def compute_match(
@@ -24,12 +25,12 @@ async def compute_match(
 
     llm_score = 0.5
     gap_analysis = (
-        "LLM analysis skipped — no GEMINI_API_KEY"
-        if not settings.gemini_api_key
+        "LLM analysis skipped — no GEMINI_API_KEY or GROQ_API_KEY"
+        if not settings.gemini_api_key and not settings.groq_api_key
         else "LLM analysis unavailable"
     )
 
-    if settings.gemini_api_key:
+    if settings.gemini_api_key or settings.groq_api_key:
         prompt = f"""You are evaluating resume-to-JD fit.
 Target position: {position_context}
 
@@ -49,8 +50,8 @@ Respond in valid JSON only, no markdown fences:
 Score 1.0 = perfect match, 0.0 = completely wrong role.
 """
         try:
-            resp = await get_client().aio.models.generate_content(model=_MODEL, contents=prompt)
-            text = resp.text.strip().strip("```json").strip("```").strip()
+            raw = await generate(prompt, gemini_model=_MODEL, groq_model=_GROQ_MODEL)
+            text = raw.strip().strip("```json").strip("```").strip()
             data = json.loads(text)
             llm_score = float(max(0.0, min(1.0, data.get("score", 0.5))))
             gap_analysis = data.get("gap_analysis", "")
