@@ -274,3 +274,98 @@ async def run_rewrite(checkpoint_id: str, sb: AsyncClient, http: httpx.AsyncClie
         await _log(sb, jd_id, "compiler", f"FAILED after all retries", error_log[:1000])
 
     return {"copy_id": copy_id, "status": status}
+
+
+async def run_manual_match(jd_id: str, sb: AsyncClient, http: httpx.AsyncClient) -> dict:
+    """
+    On-demand score + rewrite + compile for one manually-submitted JD
+    (Quick Match). No checkpoint gate — the user already expressed
+    explicit intent by submitting this specific job. Mirrors run_rewrite's
+    rewrite -> compile -> store chain, preceded by scoring.
+    """
+    jd_res = await sb.table("scraped_jds").select("*").eq("id", jd_id).maybe_single().execute()
+    if not jd_res.data:
+        return {"error": "JD not found"}
+    jd = jd_res.data
+    user_id = jd["user_id"]
+
+    user_res = await sb.table("users").select("*").eq("id", user_id).maybe_single().execute()
+    if not user_res.data:
+        return {"error": "user not found"}
+    user = user_res.data
+
+    mr_res = await (
+        sb.table("master_resume").select("*").eq("user_id", user_id)
+        .order("version", desc=True).limit(1).execute()
+    )
+    if not mr_res.data:
+        return {"error": "no master resume"}
+    master = mr_res.data[0]
+
+    # Score — position context is the job's own title, no saved-Positions lookup
+    match_data = await compute_match(jd["raw_text"], master["plain_text_cache"], jd["title"])
+    match_ins = await sb.table("jd_matches").insert({
+        "jd_id": jd_id,
+        "user_id": user_id,
+        "position_context": jd["title"],
+        **match_data,
+    }).execute()
+    match_id = match_ins.data[0]["id"]
+    await _log(sb, jd_id, "matcher",
+               f"Score: {match_data['composite_score']:.2f} | {jd['title']}",
+               match_data.get("gap_analysis", ""))
+
+    # Straight to rewrite — no checkpoint
+    copy_ins = await sb.table("resume_copies").insert({
+        "jd_id": jd_id,
+        "user_id": user_id,
+        "master_resume_id": master["id"],
+        "status": "compiling",
+        "tex_content": master["tex_content"],
+    }).execute()
+    copy_id = copy_ins.data[0]["id"]
+
+    await _log(sb, jd_id, "rewriter", "Starting rewrite...")
+
+    try:
+        rewritten_tex, diff_summary = await rewrite_resume(
+            master_tex=master["tex_content"],
+            jd_text=jd["raw_text"],
+            gap_analysis=match_data.get("gap_analysis", ""),
+            position_context=jd["title"],
+        )
+    except ValueError as e:
+        await _log(sb, jd_id, "rewriter", f"Structure violation: {e}")
+        rewritten_tex = master["tex_content"]
+        diff_summary = f"Rewrite failed (structure violation): {e}"
+
+    await _log(sb, jd_id, "rewriter", diff_summary[:300], diff_summary)
+
+    async def rewriter_fn(current_tex: str, error_log: str, attempt: int) -> tuple[str, str]:
+        return await rewrite_resume(
+            master_tex=current_tex,
+            jd_text=jd["raw_text"],
+            gap_analysis=match_data.get("gap_analysis", ""),
+            position_context=jd["title"],
+            attempt=attempt,
+            previous_error=error_log,
+        )
+
+    pdf_bytes, final_tex, error_log = await compile_with_retry(
+        http=http,
+        tex=rewritten_tex,
+        rewriter_fn=rewriter_fn,
+        max_retries=user.get("max_compiler_retries", 3),
+        jd_info={"company": jd.get("company"), "title": jd.get("title")},
+    )
+
+    status = "compiled" if pdf_bytes else "failed"
+    updates = {"tex_content": final_tex, "diff_patch": diff_summary, "status": status}
+    if pdf_bytes:
+        try:
+            updates["pdf_storage_path"] = await store_pdf(sb, user_id, copy_id, pdf_bytes)
+        except Exception as e:
+            await _log(sb, jd_id, "compiler", f"PDF storage upload failed (non-fatal): {e}")
+    await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
+
+    return {"jd_id": jd_id, "match_id": match_id, "copy_id": copy_id, "status": status}

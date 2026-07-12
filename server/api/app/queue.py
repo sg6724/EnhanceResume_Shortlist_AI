@@ -65,6 +65,21 @@ async def rewrite_resume_task(checkpoint_id: str) -> None:
         await http.aclose()
 
 
+@proc_app.task(name="run_manual_match", queue="default", retry=1)
+async def run_manual_match_task(jd_id: str) -> None:
+    import httpx
+    from supabase import acreate_client
+    from .agents.orchestrator import run_manual_match
+
+    sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    http = httpx.AsyncClient(timeout=150.0)
+    try:
+        result = await run_manual_match(jd_id, sb, http)
+        print(f"[task:manual_match] {result}")
+    finally:
+        await http.aclose()
+
+
 @proc_app.task(name="run_outreach", queue="default", retry=1)
 async def run_outreach_task(user_id: str) -> None:
     import httpx
