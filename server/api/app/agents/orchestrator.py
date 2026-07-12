@@ -7,6 +7,7 @@ from supabase import AsyncClient
 
 from ..config import settings
 from ..services.email import notify_batch_complete
+from ..services.pdf_storage import store_pdf
 from .scraper import scrape_jds
 from .filter_agent import is_jd_relevant
 from .matcher import compute_match
@@ -264,11 +265,13 @@ async def run_rewrite(checkpoint_id: str, sb: AsyncClient, http: httpx.AsyncClie
     )
 
     status = "compiled" if pdf_bytes else "failed"
-    await sb.table("resume_copies").update({
-        "tex_content": final_tex,
-        "diff_patch": diff_summary,
-        "status": status,
-    }).eq("id", copy_id).execute()
+    updates = {"tex_content": final_tex, "diff_patch": diff_summary, "status": status}
+    if pdf_bytes:
+        try:
+            updates["pdf_storage_path"] = await store_pdf(sb, user_id, copy_id, pdf_bytes)
+        except Exception as e:
+            await _log(sb, jd_id, "compiler", f"PDF storage upload failed (non-fatal): {e}")
+    await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
 
     if pdf_bytes:
         await _log(sb, jd_id, "compiler", f"PDF compiled successfully ({len(pdf_bytes):,} bytes)")
