@@ -11,6 +11,8 @@ module.exports = {
         panel: "#151923",
         border: "#1e2533",
         accent: "#6ea8fe",
+        violet: "#a78bfa",
+        teal: "#2dd4bf",
         ok: "#34d399",
         bad: "#f87171",
         warn: "#fbbf24",
