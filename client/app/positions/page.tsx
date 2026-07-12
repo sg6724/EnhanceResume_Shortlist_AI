@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, type Position } from "@/lib/api";
-import clsx from "clsx";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -33,17 +36,14 @@ export default function PositionsPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Target Positions</h1>
-        <p className="text-muted text-sm mt-1">
-          The job titles the scraper searches for. Add fuzzy keywords to catch
-          semantically related roles.
-        </p>
-      </div>
+    <div className="max-w-2xl space-y-8">
+      <PageHeader
+        title="Target Positions"
+        description="The job titles the scraper searches for. Add fuzzy keywords to catch semantically related roles."
+      />
 
       {/* Add form */}
-      <div className="bg-panel border border-border rounded-xl p-5 space-y-3">
+      <Card className="p-5 space-y-3">
         <h2 className="text-sm font-semibold text-text">Add Position</h2>
         <input
           value={title}
@@ -59,14 +59,10 @@ export default function PositionsPage() {
           className="w-full bg-bg border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
         />
         {error && <div className="text-bad text-xs">{error}</div>}
-        <button
-          onClick={add}
-          disabled={saving || !title.trim()}
-          className="bg-accent text-bg font-semibold px-5 py-2 rounded-lg text-sm hover:bg-accent/90 disabled:opacity-40 transition-all"
-        >
-          {saving ? "Adding…" : "+ Add Position"}
-        </button>
-      </div>
+        <Button onClick={add} disabled={saving || !title.trim()}>
+          {saving ? "Adding…" : "Add Position"}
+        </Button>
+      </Card>
 
       {/* List */}
       <div className="space-y-2">
@@ -76,10 +72,7 @@ export default function PositionsPage() {
           </div>
         )}
         {positions.map((p) => (
-          <div
-            key={p.id}
-            className="bg-panel border border-border rounded-xl px-5 py-4 flex items-center justify-between gap-4"
-          >
+          <Card key={p.id} className="px-5 py-4 flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="font-medium text-sm text-text">{p.title}</div>
               {p.fuzzy_keywords.length > 0 && (
@@ -89,16 +82,9 @@ export default function PositionsPage() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span
-                className={clsx(
-                  "text-[11px] px-2 py-0.5 rounded-full font-medium",
-                  p.is_active
-                    ? "bg-ok/15 text-ok"
-                    : "bg-muted/15 text-muted"
-                )}
-              >
+              <Badge tone={p.is_active ? "ok" : "muted"}>
                 {p.is_active ? "Active" : "Paused"}
-              </span>
+              </Badge>
               <button
                 onClick={() => api.togglePosition(p.id).then(load)}
                 className="text-xs text-muted hover:text-accent px-2 py-1 rounded transition-colors"
@@ -112,7 +98,7 @@ export default function PositionsPage() {
                 Delete
               </button>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </div>
