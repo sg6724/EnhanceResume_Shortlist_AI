@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 import { api, type Position } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -43,25 +45,35 @@ export default function PositionsPage() {
       />
 
       {/* Add form */}
-      <Card className="p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-text">Add Position</h2>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="Position title (e.g. AI Engineer)"
-          className="w-full bg-bg border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-        />
-        <input
-          value={keywords}
-          onChange={(e) => setKeywords(e.target.value)}
-          placeholder="Fuzzy keywords, comma-separated (e.g. ML Engineer, LLM Engineer)"
-          className="w-full bg-bg border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-        />
-        {error && <div className="text-bad text-xs">{error}</div>}
-        <Button onClick={add} disabled={saving || !title.trim()}>
-          {saving ? "Adding…" : "Add Position"}
-        </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle>Add Position</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="position-title">Position title</Label>
+            <Input
+              id="position-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder="e.g. AI Engineer"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="position-keywords">Fuzzy keywords</Label>
+            <Input
+              id="position-keywords"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="Comma-separated, e.g. ML Engineer, LLM Engineer"
+            />
+          </div>
+          {error && <div className="text-bad text-xs">{error}</div>}
+          <Button onClick={add} disabled={saving || !title.trim()}>
+            {saving ? "Adding…" : "Add Position"}
+          </Button>
+        </CardContent>
       </Card>
 
       {/* List */}
