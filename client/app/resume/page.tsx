@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
 import { api, type MasterResumeUploadResult } from "@/lib/api";
-import clsx from "clsx";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
 const EXAMPLE_TEX = `\\documentclass[11pt,a4paper]{article}
 \\usepackage[margin=1in]{geometry}
@@ -51,16 +53,13 @@ export default function ResumePage() {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Master Resume</h1>
-        <p className="text-muted text-sm mt-1">
-          Your LaTeX source of truth. Agents fork from this — they never modify it
-          directly. Uploading a new version marks existing copies as stale.
-        </p>
-      </div>
+    <div className="max-w-3xl space-y-8">
+      <PageHeader
+        title="Master Resume"
+        description="Your LaTeX source of truth. Agents fork from this — they never modify it directly. Uploading a new version marks existing copies as stale."
+      />
 
-      <div className="bg-panel border border-border rounded-xl p-5 space-y-4">
+      <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-xs text-muted uppercase tracking-wider font-medium">
             LaTeX Source (.tex)
@@ -84,20 +83,11 @@ export default function ResumePage() {
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted">{tex.length.toLocaleString()} chars</span>
-          <button
-            onClick={upload}
-            disabled={uploading || !tex.trim()}
-            className={clsx(
-              "font-semibold px-6 py-2.5 rounded-xl text-sm transition-all",
-              uploading || !tex.trim()
-                ? "bg-accent/30 text-accent/50 cursor-not-allowed"
-                : "bg-accent text-bg hover:bg-accent/90 active:scale-95"
-            )}
-          >
+          <Button pill onClick={upload} disabled={uploading || !tex.trim()}>
             {uploading ? "Uploading…" : "Upload Master Resume"}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {result && (
         <div className="bg-ok/10 border border-ok/30 rounded-xl p-4 text-sm">
@@ -115,13 +105,13 @@ export default function ResumePage() {
         </div>
       )}
 
-      <div className="bg-panel border border-border rounded-xl p-4 text-xs text-muted space-y-1.5">
+      <Card className="p-4 text-xs text-muted space-y-1.5">
         <div className="font-semibold text-text text-sm mb-2">Rules the agents follow</div>
         <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\\begin{"{}"}...\\end{"{}"}</code> blocks</div>
         <div>• Never add or delete LaTeX environments</div>
         <div>• Never modify your preamble or packages</div>
         <div>• Return the full .tex + a diff of every change made</div>
-      </div>
+      </Card>
     </div>
   );
 }
