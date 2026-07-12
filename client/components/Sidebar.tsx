@@ -6,14 +6,14 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: "◈" },
-  { href: "/positions", label: "Positions", icon: "🎯" },
-  { href: "/resume", label: "Master Resume", icon: "📄" },
-  { href: "/matches", label: "Job Matches", icon: "🔍" },
-  { href: "/checkpoints", label: "Checkpoints", icon: "✅" },
-  { href: "/outreach", label: "Outreach", icon: "✉️" },
-  { href: "/copies", label: "Resume Copies", icon: "📋" },
-  { href: "/traces", label: "Observability", icon: "🔭" },
+  { href: "/", label: "Dashboard" },
+  { href: "/positions", label: "Positions" },
+  { href: "/resume", label: "Master Resume" },
+  { href: "/matches", label: "Job Matches" },
+  { href: "/checkpoints", label: "Checkpoints" },
+  { href: "/outreach", label: "Outreach" },
+  { href: "/copies", label: "Resume Copies" },
+  { href: "/traces", label: "Observability" },
 ];
 
 export default function Sidebar() {
@@ -54,13 +54,12 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150",
+                "block px-3 py-2 rounded-lg text-sm transition-all duration-150",
                 active
                   ? "bg-accent/15 text-accent font-semibold"
                   : "text-muted hover:text-text hover:bg-white/[0.04]"
               )}
             >
-              <span className="text-[15px] w-5 text-center">{item.icon}</span>
               {item.label}
             </Link>
           );
