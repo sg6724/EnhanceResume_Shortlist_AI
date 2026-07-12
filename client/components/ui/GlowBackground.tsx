@@ -2,12 +2,12 @@ export function GlowBackground() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 h-72 -z-10 opacity-40 blur-3xl"
+      className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] -z-10 blur-2xl"
       style={{
         background:
-          "radial-gradient(60% 100% at 20% 0%, #6ea8fe 0%, transparent 60%), " +
-          "radial-gradient(50% 100% at 60% 0%, #a78bfa 0%, transparent 60%), " +
-          "radial-gradient(40% 100% at 90% 20%, #2dd4bf 0%, transparent 60%)",
+          "radial-gradient(45% 80% at 15% 10%, rgba(110,168,254,0.55) 0%, transparent 70%), " +
+          "radial-gradient(40% 80% at 55% 0%, rgba(167,139,250,0.5) 0%, transparent 70%), " +
+          "radial-gradient(35% 70% at 90% 15%, rgba(45,212,191,0.45) 0%, transparent 70%)",
       }}
     />
   );
