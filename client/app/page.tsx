@@ -1,21 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState, type ComponentType } from "react";
 import { api, type Stats } from "@/lib/api";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GlowBackground } from "@/components/ui/GlowBackground";
-import { Button } from "@/components/ui/Button";
-import { SquiggleUnderline } from "@/components/ui/Doodles";
+import { SquiggleUnderline, DocumentStackIcon, TargetIcon, CopyStackIcon, ClockIcon } from "@/components/ui/Doodles";
 import clsx from "clsx";
-
-const PIPELINE_STEPS = [
-  { label: "Scraper Agent", desc: "Fetches JDs from RemoteOK & Adzuna" },
-  { label: "LLM Filter", desc: "Removes irrelevant roles before scoring" },
-  { label: "Matcher Agent", desc: "BM25 + embeddings + Gemini scoring" },
-  { label: "Checkpoint", desc: "You approve the planned diff" },
-  { label: "Rewriter Agent", desc: "Forks & tailors your master resume" },
-  { label: "Compiler Agent", desc: "Produces the final PDF via pdflatex" },
-];
 
 function RocketIllustration({ className }: { className?: string }) {
   return (
@@ -43,11 +32,22 @@ function RocketIllustration({ className }: { className?: string }) {
   );
 }
 
-function MiniStat({ label, value, color = "text-text" }: { label: string; value: number | string; color?: string }) {
+function StatTile({
+  icon: Icon, label, value, color, chipClass,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: number | string;
+  color: string;
+  chipClass: string;
+}) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="text-muted text-[10px] uppercase tracking-wider font-medium">{label}</div>
-      <div className={clsx("text-xl font-bold tabular-nums", color)}>{value}</div>
+    <div className="rounded-2xl border border-border bg-bg/50 p-5">
+      <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center mb-4", chipClass)}>
+        <Icon className="w-4 h-4" />
+      </div>
+      <div className="text-muted text-[11px] uppercase tracking-wider font-medium">{label}</div>
+      <div className={clsx("text-3xl font-bold tabular-nums mt-1", color)}>{value}</div>
     </div>
   );
 }
@@ -77,95 +77,40 @@ export default function LandingPage() {
               copies.
             </h1>
             <p className="text-muted text-lg mt-6 max-w-lg">
-              Fork your master resume for every job description, score the match with
-              BM25 + embeddings + Gemini, and let agents rewrite, compile, and reach out —
-              you just approve the checkpoints.
+              Paste a job posting or a company&apos;s career page and get back a resume tailored
+              to that role, scored against it, and a cover letter ready to review — no manual
+              reformatting, no generic templates.
             </p>
-            <div className="mt-8 flex items-center gap-4">
-              <Button variant="primary" pill asChild>
-                <Link href="/dashboard">Open Dashboard →</Link>
-              </Button>
-            </div>
-            <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-              <span>{stats?.total_jds ?? "—"} JDs scraped</span>
-              <span>·</span>
-              <span>{stats?.total_copies ?? "—"} tailored resumes</span>
-              <span>·</span>
-              <span>{stats?.pending_checkpoints ?? "—"} pending review</span>
-            </div>
           </div>
           <RocketIllustration className="hidden md:block w-56 h-56 text-text/70 flex-shrink-0 justify-self-end" />
         </div>
 
         {/* Mockup panel */}
-        <GlassCard className="p-6 mt-16" chromeLabel="dashboard.gethired.ai">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-6 mb-6 border-b border-border">
-            <MiniStat label="JDs Scraped" value={stats?.total_jds ?? "—"} />
-            <MiniStat label="Matches" value={stats?.total_matches ?? "—"} color="text-accent" />
-            <MiniStat label="Copies Made" value={stats?.total_copies ?? "—"} color="text-ok" />
-            <MiniStat label="Pending" value={stats?.pending_checkpoints ?? "—"} color="text-warn" />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {PIPELINE_STEPS.map((step, i) => (
-              <div key={i} className="bg-bg rounded-xl p-4 border border-border">
-                <div className="text-xs font-semibold text-text">{step.label}</div>
-                <div className="text-[11px] text-muted mt-0.5">{step.desc}</div>
+        <div className="mt-16">
+          <GlassCard className="p-8 md:p-10" chromeLabel="dashboard.gethired.ai">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-muted font-medium">Pipeline overview</div>
+                <div className="text-xl font-display text-text mt-0.5">Your dashboard</div>
               </div>
-            ))}
-          </div>
-        </GlassCard>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="scroll-mt-24">
-        <h2 className="font-display text-3xl text-text">
-          How it <em className="italic">works</em>
-        </h2>
-        <p className="text-muted text-sm mt-2 max-w-xl">
-          Six agents, sequenced by one orchestrator — no agent calls another.
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-8">
-          {PIPELINE_STEPS.map((step, i) => (
-            <GlassCard key={i} chrome={false} className="p-5">
-              <div className="text-[10px] text-muted uppercase tracking-widest font-medium mb-1">
-                Step {i + 1}
+              <div className="flex items-center gap-1.5 text-xs text-ok font-medium">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-ok opacity-60" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-ok" />
+                </span>
+                Live
               </div>
-              <div className="text-sm font-semibold text-text">{step.label}</div>
-              <div className="text-xs text-muted mt-1">{step.desc}</div>
-            </GlassCard>
-          ))}
-        </div>
-      </section>
-
-      {/* Status */}
-      <section id="status" className="scroll-mt-24">
-        <h2 className="font-display text-3xl text-text">
-          Live <em className="italic">status</em>
-        </h2>
-        <p className="text-muted text-sm mt-2 max-w-xl">
-          Real numbers from your pipeline, not a sales deck.
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-          <GlassCard chrome={false} className="p-5 flex flex-col gap-1">
-            <div className="text-muted text-xs uppercase tracking-widest font-medium">JDs Scraped</div>
-            <div className="text-3xl font-bold tabular-nums text-text">{stats?.total_jds ?? "—"}</div>
-          </GlassCard>
-          <GlassCard chrome={false} className="p-5 flex flex-col gap-1">
-            <div className="text-muted text-xs uppercase tracking-widest font-medium">Matches</div>
-            <div className="text-3xl font-bold tabular-nums text-accent">{stats?.total_matches ?? "—"}</div>
-            <div className="text-muted text-xs">above threshold</div>
-          </GlassCard>
-          <GlassCard chrome={false} className="p-5 flex flex-col gap-1">
-            <div className="text-muted text-xs uppercase tracking-widest font-medium">Copies Made</div>
-            <div className="text-3xl font-bold tabular-nums text-ok">{stats?.total_copies ?? "—"}</div>
-            <div className="text-muted text-xs">tailored resumes</div>
-          </GlassCard>
-          <GlassCard chrome={false} className="p-5 flex flex-col gap-1">
-            <div className="text-muted text-xs uppercase tracking-widest font-medium">Pending</div>
-            <div className={clsx("text-3xl font-bold tabular-nums", stats?.pending_checkpoints ? "text-warn" : "text-text")}>
-              {stats?.pending_checkpoints ?? "—"}
             </div>
-            <div className="text-muted text-xs">need approval</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatTile icon={DocumentStackIcon} label="JDs Scraped" value={stats?.total_jds ?? "—"}
+                color="text-text" chipClass="bg-text/5 text-text" />
+              <StatTile icon={TargetIcon} label="Matches" value={stats?.total_matches ?? "—"}
+                color="text-accent" chipClass="bg-accent/10 text-accent" />
+              <StatTile icon={CopyStackIcon} label="Copies Made" value={stats?.total_copies ?? "—"}
+                color="text-ok" chipClass="bg-ok/10 text-ok" />
+              <StatTile icon={ClockIcon} label="Pending" value={stats?.pending_checkpoints ?? "—"}
+                color="text-warn" chipClass="bg-warn/10 text-warn" />
+            </div>
           </GlassCard>
         </div>
       </section>

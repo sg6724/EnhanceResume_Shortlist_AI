@@ -97,25 +97,15 @@ export function Navbar() {
           {DROPDOWNS.map((dropdown) => (
             <NavDropdown key={dropdown.label} label={dropdown.label} items={dropdown.items} active={path} />
           ))}
-          {isLanding && (
-            <>
-              <a href="#how-it-works" className="px-3 py-2 rounded-lg text-sm font-medium text-muted hover:text-text transition-colors">
-                How it works
-              </a>
-              <a href="#status" className="px-3 py-2 rounded-lg text-sm font-medium text-muted hover:text-text transition-colors">
-                Status
-              </a>
-            </>
-          )}
         </nav>
 
         {isLanding ? (
           <div className="flex items-center gap-3 flex-shrink-0">
             <Button variant="secondary" pill asChild>
-              <Link href="/dashboard">Open Dashboard</Link>
+              <Link href="/quick-match">Quick Match</Link>
             </Button>
             <Button variant="primary" pill asChild>
-              <Link href="/dashboard">Get Started</Link>
+              <Link href="/outreach">Application Prep</Link>
             </Button>
           </div>
         ) : (
