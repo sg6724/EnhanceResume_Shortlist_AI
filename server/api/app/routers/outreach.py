@@ -8,16 +8,10 @@ from ..config import settings
 router = APIRouter(prefix="/outreach", tags=["application-prep"])
 
 
-class WatchlistIn(BaseModel):
-    company_name: str
-    company_domain: str | None = None
-
-
-class TargetPatch(BaseModel):
-    founder_name: str | None = None
-    founder_title: str | None = None
-    founder_email: str | None = None
-    retry: bool = False
+class PrepareIn(BaseModel):
+    career_urls: list[str] = []
+    linkedin_urls: list[str] = []
+    x_urls: list[str] = []
 
 
 class DraftPatch(BaseModel):
@@ -46,69 +40,28 @@ async def list_targets(request: Request):
     return res.data
 
 
-@router.post("/watchlist", status_code=201)
-async def add_watchlist(body: WatchlistIn, request: Request):
-    sb = request.app.state.supabase
-    uid = await _get_user_id(sb, settings.user_email)
-    company = body.company_name.strip()
-    if not company:
-        raise HTTPException(422, "company_name is required")
-    dup = await (
-        sb.table("outreach_targets")
-        .select("id")
-        .eq("user_id", uid)
-        .eq("company_name", company)
-        .is_("jd_id", "null")
-        .maybe_single()
-        .execute()
-    )
-    if dup and dup.data:
-        raise HTTPException(409, "company already tracked")
-    res = await sb.table("outreach_targets").insert({
-        "user_id": uid,
-        "company_name": company,
-        "company_domain": body.company_domain,
-        "source": "watchlist",
-        "status": "pending",
-    }).execute()
-    return res.data[0]
-
-
-@router.patch("/targets/{target_id}")
-async def patch_target(target_id: str, body: TargetPatch, request: Request):
-    sb = request.app.state.supabase
-    uid = await _get_user_id(sb, settings.user_email)
-    cur = await (
-        sb.table("outreach_targets")
-        .select("*")
-        .eq("id", target_id)
-        .eq("user_id", uid)
-        .maybe_single()
-        .execute()
-    )
-    if not cur or not cur.data:
-        raise HTTPException(404, "target not found")
-    updates: dict = {}
-    if body.retry:
-        updates = {"status": "pending", "failure_reason": None, "attempts": 0}
-    if body.founder_name is not None:
-        updates["founder_name"] = body.founder_name
-    if body.founder_title is not None:
-        updates["founder_title"] = body.founder_title
-    if body.founder_email is not None:
-        updates["founder_email"] = body.founder_email
-    if not updates:
-        raise HTTPException(400, "nothing to update")
-    res = await sb.table("outreach_targets").update(updates).eq("id", target_id).execute()
-    return res.data[0]
-
-
 @router.delete("/targets/{target_id}")
 async def delete_target(target_id: str, request: Request):
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
     await sb.table("outreach_targets").delete().eq("id", target_id).eq("user_id", uid).execute()
     return {"deleted": target_id}
+
+
+@router.post("/targets/{target_id}/retry")
+async def retry_target(target_id: str, request: Request):
+    if not settings.database_url:
+        raise HTTPException(503, "DATABASE_URL not set; Procrastinate queue unavailable")
+    sb = request.app.state.supabase
+    uid = await _get_user_id(sb, settings.user_email)
+    cur = await (
+        sb.table("outreach_targets").select("id").eq("id", target_id).eq("user_id", uid).maybe_single().execute()
+    )
+    if not cur or not cur.data:
+        raise HTTPException(404, "target not found")
+    from ..queue import retry_application_target_task
+    await retry_application_target_task.defer_async(target_id=target_id)
+    return {"queued": True}
 
 
 @router.get("/drafts")
@@ -119,8 +72,6 @@ async def list_drafts(request: Request):
         sb.table("outreach_drafts")
         .select("*, outreach_targets!inner(*)")
         .eq("outreach_targets.user_id", uid)
-        .in_("outreach_targets.status", ["drafted", "approved"])
-        .is_("sent_at", "null")
         .order("created_at", desc=True)
         .execute()
     )
@@ -172,22 +123,38 @@ async def reject_draft(draft_id: str, request: Request):
     return {"status": "skipped"}
 
 
-@router.post("/run")
-async def run_now(request: Request):
+@router.post("/prepare", status_code=201)
+async def prepare_application(body: PrepareIn, request: Request):
     if not settings.database_url:
         raise HTTPException(503, "DATABASE_URL not set; Procrastinate queue unavailable")
+    if not (body.career_urls or body.linkedin_urls or body.x_urls):
+        raise HTTPException(422, "at least one URL is required")
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
-    from ..queue import run_outreach_task
-    await run_outreach_task.defer_async(user_id=uid)
-    return {"queued": True}
+    run_ins = await sb.table("application_runs").insert({
+        "user_id": uid, "status": "running",
+        "career_urls": body.career_urls, "linkedin_urls": body.linkedin_urls, "x_urls": body.x_urls,
+    }).execute()
+    run_id = run_ins.data[0]["id"]
+    from ..queue import prepare_application_task
+    await prepare_application_task.defer_async(
+        run_id=run_id, user_id=uid,
+        career_urls=body.career_urls, linkedin_urls=body.linkedin_urls, x_urls=body.x_urls,
+    )
+    return {"run_id": run_id}
 
 
-@router.get("/quota")
-async def quota(request: Request):
-    return {
-        "apify_configured": bool(settings.apify.api_token),
-        "career_actor_configured": bool(settings.apify.career_actor_id),
-        "linkedin_actor_configured": bool(settings.apify.linkedin_actor_id),
-        "x_actor_configured": bool(settings.apify.x_actor_id),
-    }
+@router.get("/runs/{run_id}")
+async def get_run(run_id: str, request: Request):
+    sb = request.app.state.supabase
+    res = await sb.table("application_runs").select("*").eq("id", run_id).maybe_single().execute()
+    if not res or not res.data:
+        raise HTTPException(404, "run not found")
+    run = res.data
+    if run["status"] != "running":
+        percent = 100
+    elif run["jds_found"] == 0:
+        percent = 5
+    else:
+        percent = min(95, round(10 + 90 * run["jds_done"] / run["jds_found"]))
+    return {**run, "percent": percent}
