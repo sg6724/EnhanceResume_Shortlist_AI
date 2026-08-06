@@ -56,7 +56,7 @@ services:
       - key: USER_EMAIL
         value: samriddhigupta426@gmail.com
       - key: CORS_ORIGINS
-        value: http://localhost:3000,http://127.0.0.1:3000
+        value: https://gethired-ai-client.vercel.app,http://localhost:3000,http://127.0.0.1:3000
       - key: COMPILE_SERVICE_HOSTPORT
         fromService:
           type: web
