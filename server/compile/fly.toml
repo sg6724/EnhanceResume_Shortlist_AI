@@ -1,0 +1,27 @@
+# Fly.io app config for the LaTeX compile service (TeX Live + latexmk).
+# Deploy with `fly deploy` from this directory, after `fly launch --no-deploy`.
+# No secrets needed — this service is stateless and only talks to the API
+# over Fly's private network (COMPILE_SERVICE_URL on the api app).
+
+app = "gethired-compile"
+primary_region = "bom"
+
+[build]
+
+[http_service]
+internal_port = 8001
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 0
+
+[[http_service.checks]]
+grace_period = "10s"
+interval = "15s"
+method = "GET"
+timeout = "5s"
+path = "/health"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "1gb"
