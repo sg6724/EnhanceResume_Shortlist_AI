@@ -58,6 +58,19 @@ def test_compile_section():
     assert s.compile.compile_service_url == "http://localhost:8001"
 
 
+def test_compile_section_uses_render_hostport_when_default_url_is_unchanged():
+    s = _make_settings(compile_service_hostport="gethired-compile:10000")
+    assert s.compile.compile_service_url == "http://gethired-compile:10000"
+
+
+def test_compile_section_explicit_url_overrides_render_hostport():
+    s = _make_settings(
+        compile_service_url="https://compile.example.com",
+        compile_service_hostport="gethired-compile:10000",
+    )
+    assert s.compile.compile_service_url == "https://compile.example.com"
+
+
 def test_old_import_path_reexports_same_settings_class():
     from app.config import Settings as OldSettings
     from app.config import settings as old_settings_instance

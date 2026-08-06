@@ -12,6 +12,6 @@ async def compile_tex(
     jobname: str = "resume",
 ) -> httpx.Response:
     return await http.post(
-        f"{settings.compile_service_url}/compile",
+        f"{settings.compile.compile_service_url}/compile",
         json={"tex": tex, "engine": engine, "jobname": jobname},
     )

@@ -26,7 +26,7 @@ async def compile_with_retry(
     for attempt in range(1, max_retries + 1):
         try:
             resp = await http.post(
-                f"{settings.compile_service_url}/compile",
+                f"{settings.compile.compile_service_url}/compile",
                 json={"tex": current_tex, "engine": "pdflatex", "jobname": "resume"},
                 timeout=150.0,
             )

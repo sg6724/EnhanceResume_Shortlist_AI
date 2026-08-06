@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: gethired-compile
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./server/compile/Dockerfile
+    dockerContext: ./server/compile
+    healthCheckPath: /health
+
+  - type: web
+    name: gethired-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./server/api/Dockerfile
+    dockerContext: ./server/api
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: noreply@gethired.ai
+      - key: HUNTER_API_KEY
+        sync: false
+      - key: APOLLO_API_KEY
+        sync: false
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_API_KEY
+        sync: false
+      - key: APIFY_API_TOKEN
+        sync: false
+      - key: APIFY_CAREER_ACTOR_ID
+        value: apify/website-content-crawler
+      - key: APIFY_LINKEDIN_ACTOR_ID
+        sync: false
+      - key: APIFY_X_ACTOR_ID
+        sync: false
+      - key: APIFY_CAREER_URLS
+        sync: false
+      - key: APIFY_LINKEDIN_URLS
+        sync: false
+      - key: APIFY_X_URLS
+        sync: false
+      - key: USER_EMAIL
+        value: tecmaths4mumbai@gmail.com
+      - key: CORS_ORIGINS
+        value: http://localhost:3000,http://127.0.0.1:3000
+      - key: COMPILE_SERVICE_HOSTPORT
+        fromService:
+          type: web
+          name: gethired-compile
+          property: hostport

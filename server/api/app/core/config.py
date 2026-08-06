@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     database_url: str = ""  # postgresql+asyncpg://... for Procrastinate
 
     compile_service_url: str = "http://localhost:8001"
+    compile_service_hostport: str = ""
 
     gemini_api_key: str = ""
     groq_api_key: str = ""
@@ -69,6 +70,7 @@ class Settings(BaseSettings):
     apify_x_urls: str = ""
 
     user_email: str = "tecmaths4mumbai@gmail.com"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     @property
     def db(self) -> DbSettings:
@@ -109,7 +111,10 @@ class Settings(BaseSettings):
 
     @property
     def compile(self) -> CompileSettings:
-        return CompileSettings(compile_service_url=self.compile_service_url)
+        compile_service_url = self.compile_service_url
+        if self.compile_service_hostport and compile_service_url == "http://localhost:8001":
+            compile_service_url = f"http://{self.compile_service_hostport}"
+        return CompileSettings(compile_service_url=compile_service_url)
 
 
 settings = Settings()
