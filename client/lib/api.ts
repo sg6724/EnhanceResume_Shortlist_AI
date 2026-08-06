@@ -141,19 +141,14 @@ export interface OutreachTarget {
   id: string;
   company_name: string;
   company_domain: string | null;
-  source: "pipeline" | "watchlist";
+  source: "career_page" | "linkedin" | "x" | "quick_match";
   jd_id: string | null;
   role_title: string | null;
-  status:
-    | "pending" | "contact_found" | "contact_not_found"
-    | "drafted" | "approved" | "sent" | "failed" | "skipped";
-  founder_name: string | null;
-  founder_title: string | null;
-  founder_email: string | null;
-  email_confidence: "verified" | "guessed" | null;
-  contact_method: string | null;
+  status: "drafted" | "approved" | "skipped" | "failed";
   failure_reason: string | null;
+  attempts: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface OutreachDraft {
@@ -164,17 +159,25 @@ export interface OutreachDraft {
   edited_subject: string | null;
   edited_body: string | null;
   resume_copy_id: string | null;
-  sent_at: string | null;
-  send_error: string | null;
   created_at: string;
   outreach_targets: OutreachTarget;
 }
 
-export interface OutreachQuota {
-  apify_configured: boolean;
-  career_actor_configured: boolean;
-  linkedin_actor_configured: boolean;
-  x_actor_configured: boolean;
+export interface ApplicationRun {
+  id: string;
+  user_id: string;
+  status: "running" | "done" | "failed";
+  career_urls: string[];
+  linkedin_urls: string[];
+  x_urls: string[];
+  jds_found: number;
+  jds_done: number;
+  targets_drafted: number;
+  targets_failed: number;
+  error: string | null;
+  percent: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ScrapeSources {
@@ -207,6 +210,7 @@ export interface QuickMatchFetchResult {
 export interface QuickMatchStatus {
   match: JdMatch | null;
   copy: ResumeCopy | null;
+  draft: OutreachDraft | null;
 }
 
 // ── API client ─────────────────────────────────────────────────────────────
@@ -272,19 +276,10 @@ export const api = {
 
   // Outreach
   outreachTargets: () => req<OutreachTarget[]>("/outreach/targets"),
-  addWatchlist: (company_name: string, company_domain?: string) =>
-    req<OutreachTarget>("/outreach/watchlist", {
-      method: "POST",
-      body: JSON.stringify({ company_name, company_domain: company_domain || null }),
-    }),
-  patchTarget: (id: string, patch: Partial<Pick<OutreachTarget,
-    "founder_name" | "founder_title" | "founder_email">> & { retry?: boolean }) =>
-    req<OutreachTarget>(`/outreach/targets/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-    }),
   deleteTarget: (id: string) =>
     req<{ deleted: string }>(`/outreach/targets/${id}`, { method: "DELETE" }),
+  retryTarget: (id: string) =>
+    req<{ queued: boolean }>(`/outreach/targets/${id}/retry`, { method: "POST" }),
   outreachDrafts: () => req<OutreachDraft[]>("/outreach/drafts"),
   patchDraft: (id: string, subject?: string, body?: string) =>
     req<OutreachDraft>(`/outreach/drafts/${id}`, {
@@ -295,8 +290,12 @@ export const api = {
     req<{ status: string }>(`/outreach/drafts/${id}/approve`, { method: "POST" }),
   rejectDraft: (id: string) =>
     req<{ status: string }>(`/outreach/drafts/${id}/reject`, { method: "POST" }),
-  runOutreach: () => req<{ queued: boolean }>("/outreach/run", { method: "POST" }),
-  outreachQuota: () => req<OutreachQuota>("/outreach/quota"),
+  prepareApplication: (sources: ScrapeSources) =>
+    req<{ run_id: string }>("/outreach/prepare", {
+      method: "POST",
+      body: JSON.stringify(sources),
+    }),
+  getApplicationRun: (runId: string) => req<ApplicationRun>(`/outreach/runs/${runId}`),
 
   // Quick Match
   quickMatchFetchUrl: (url: string) =>

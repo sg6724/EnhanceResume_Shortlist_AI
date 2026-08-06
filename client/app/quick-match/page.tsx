@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Label } from "@/components/ui/Label";
+import { CoverLetterCard } from "@/components/CoverLetterCard";
 
 type Stage = "idle" | "fetching" | "reviewing" | "running" | "done";
 
@@ -21,6 +22,7 @@ export default function QuickMatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<QuickMatchStatus | null>(null);
   const [extracted, setExtracted] = useState<QuickMatchFetchResult | null>(null);
+  const [jdId, setJdId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export default function QuickMatchPage() {
     setStage("running");
     try {
       const res = await api.quickMatchSubmit(jdText.trim(), company.trim(), title.trim());
+      setJdId(res.jd_id);
       pollRef.current = setInterval(async () => {
         const s = await api.quickMatchStatus(res.jd_id);
         setStatus(s);
@@ -270,6 +273,15 @@ export default function QuickMatchPage() {
                     Compile failed after retries. Check the Observability page for the error log.
                   </div>
                 )}
+              </div>
+            )}
+
+            {status?.draft && stage === "done" && jdId && (
+              <div className="pt-2">
+                <CoverLetterCard
+                  draft={status.draft}
+                  onDone={() => api.quickMatchStatus(jdId).then(setStatus)}
+                />
               </div>
             )}
 
