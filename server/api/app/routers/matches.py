@@ -15,14 +15,14 @@ async def _get_user_id(sb, email: str) -> str:
 
 
 @router.get("")
-async def list_matches(request: Request, limit: int = 50, offset: int = 0):
+async def list_matches(request: Request, limit: int = 200, offset: int = 0):
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
     res = await (
         sb.table("jd_matches")
         .select("*, scraped_jds(company, title, location, url, source)")
         .eq("user_id", uid)
-        .order("composite_score", desc=True)
+        .order("created_at", desc=True)
         .range(offset, offset + limit - 1)
         .execute()
     )
