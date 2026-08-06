@@ -27,6 +27,7 @@ from .routers import (
     checkpoints,
     traces,
     outreach,
+    quick_match,
 )
 
 
@@ -74,3 +75,4 @@ app.include_router(copies.router)
 app.include_router(checkpoints.router)
 app.include_router(traces.router)
 app.include_router(outreach.router)
+app.include_router(quick_match.router)

@@ -22,7 +22,7 @@ def test_banned_phrase_fails():
 
 
 def test_over_220_words_fails():
-    assert validate_letter(GOOD[0], "word " * 221) is not None
+    assert validate_letter(GOOD[0], "word " * 421) is not None
 
 
 async def test_write_letter_returns_subject_and_body(monkeypatch):
@@ -42,6 +42,26 @@ async def test_write_letter_returns_subject_and_body(monkeypatch):
         company_name="Acme",
     )
     assert subject == "Backend Engineer - Ada"
+    assert "FastAPI" in body
+
+
+async def test_write_application_cover_letter(monkeypatch):
+    monkeypatch.setattr(letter_writer.settings, "gemini_api_key", "k")
+
+    async def fake_generate(prompt, *, gemini_model, groq_model):
+        assert "cover letter" in prompt.lower()
+        assert "founder" not in prompt.lower()
+        return '{"subject": "Backend Engineer - Acme", "body": "' + GOOD[1] + '"}'
+
+    monkeypatch.setattr(letter_writer, "generate", fake_generate)
+
+    subject, body = await letter_writer.write_application_cover_letter(
+        resume_text="resume text",
+        jd_text="jd text",
+        role_title="Backend Engineer",
+        company_name="Acme",
+    )
+    assert subject == "Backend Engineer - Acme"
     assert "FastAPI" in body
 
 

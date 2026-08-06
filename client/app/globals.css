@@ -2,35 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #0b0d12;
-  --panel: #151923;
-  --border: #1e2533;
-  --accent: #6ea8fe;
-  --ok: #34d399;
-  --bad: #f87171;
-  --warn: #fbbf24;
-  --muted: #8b93a7;
-  --text: #e6e9ef;
-}
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #F5F3EF;
+  color: #141414;
   -webkit-font-smoothing: antialiased;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #2d3548; }
+::-webkit-scrollbar-thumb { background: #E6E2D8; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #D4CEC0; }
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid #111114;
   outline-offset: 2px;
 }

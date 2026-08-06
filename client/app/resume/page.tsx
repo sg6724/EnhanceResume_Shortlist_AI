@@ -1,7 +1,11 @@
 "use client";
 import { useState } from "react";
 import { api, type MasterResumeUploadResult } from "@/lib/api";
-import clsx from "clsx";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
+import { Label } from "@/components/ui/Label";
 
 const EXAMPLE_TEX = `\\documentclass[11pt,a4paper]{article}
 \\usepackage[margin=1in]{geometry}
@@ -51,20 +55,16 @@ export default function ResumePage() {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Master Resume</h1>
-        <p className="text-muted text-sm mt-1">
-          Your LaTeX source of truth. Agents fork from this — they never modify it
-          directly. Uploading a new version marks existing copies as stale.
-        </p>
-      </div>
+    <div className="max-w-3xl space-y-8">
+      <PageHeader
+        title="Master"
+        titleEmphasis="Resume"
+        description="Your LaTeX source of truth. Agents fork from this — they never modify it directly. Uploading a new version marks existing copies as stale."
+      />
 
-      <div className="bg-panel border border-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-muted uppercase tracking-wider font-medium">
-            LaTeX Source (.tex)
-          </label>
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <Label htmlFor="tex-source">LaTeX Source (.tex)</Label>
           {!tex && (
             <button
               onClick={() => setTex(EXAMPLE_TEX)}
@@ -73,31 +73,25 @@ export default function ResumePage() {
               Load example
             </button>
           )}
-        </div>
-        <textarea
-          value={tex}
-          onChange={(e) => setTex(e.target.value)}
-          placeholder={EXAMPLE_TEX}
-          rows={22}
-          spellCheck={false}
-          className="w-full bg-bg border border-border rounded-lg px-4 py-3 text-sm font-mono text-text placeholder:text-muted/40 focus:outline-none focus:border-accent resize-none transition-colors"
-        />
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">{tex.length.toLocaleString()} chars</span>
-          <button
-            onClick={upload}
-            disabled={uploading || !tex.trim()}
-            className={clsx(
-              "font-semibold px-6 py-2.5 rounded-xl text-sm transition-all",
-              uploading || !tex.trim()
-                ? "bg-accent/30 text-accent/50 cursor-not-allowed"
-                : "bg-accent text-bg hover:bg-accent/90 active:scale-95"
-            )}
-          >
-            {uploading ? "Uploading…" : "Upload Master Resume"}
-          </button>
-        </div>
-      </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            id="tex-source"
+            value={tex}
+            onChange={(e) => setTex(e.target.value)}
+            placeholder={EXAMPLE_TEX}
+            rows={22}
+            spellCheck={false}
+            className="font-mono"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted">{tex.length.toLocaleString()} chars</span>
+            <Button pill onClick={upload} disabled={uploading || !tex.trim()}>
+              {uploading ? "Uploading…" : "Upload Master Resume"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {result && (
         <div className="bg-ok/10 border border-ok/30 rounded-xl p-4 text-sm">
@@ -115,13 +109,17 @@ export default function ResumePage() {
         </div>
       )}
 
-      <div className="bg-panel border border-border rounded-xl p-4 text-xs text-muted space-y-1.5">
-        <div className="font-semibold text-text text-sm mb-2">Rules the agents follow</div>
-        <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\\begin{"{}"}...\\end{"{}"}</code> blocks</div>
-        <div>• Never add or delete LaTeX environments</div>
-        <div>• Never modify your preamble or packages</div>
-        <div>• Return the full .tex + a diff of every change made</div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Rules the agents follow</CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-muted space-y-1.5">
+          <div>• Only edit content inside existing <code className="bg-bg px-1 rounded">\begin{"{}"}...\end{"{}"}</code> blocks</div>
+          <div>• Never add or delete LaTeX environments</div>
+          <div>• Never modify your preamble or packages</div>
+          <div>• Return the full .tex + a diff of every change made</div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

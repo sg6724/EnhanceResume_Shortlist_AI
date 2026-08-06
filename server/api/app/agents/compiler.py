@@ -45,7 +45,7 @@ async def compile_with_retry(
                 current_tex, _ = await rewriter_fn(current_tex, last_error, attempt)
             except Exception as e:
                 last_error = f"Rewriter error on attempt {attempt}: {e}"
-                break
+                continue
 
     # All attempts failed
     if jd_info:

@@ -16,7 +16,7 @@ BANNED_PHRASES = [
     "dear madam",
     "i am writing to express",
 ]
-MAX_WORDS = 220
+MAX_WORDS = 420
 
 
 def validate_letter(subject: str, body: str) -> str | None:
@@ -43,18 +43,33 @@ async def write_letter(
     founder_title: str,
     company_name: str,
 ) -> tuple[str, str]:
-    """Gemini 2.5 Flash (Groq fallback) drafts a direct cover-letter email. Returns (subject, body)."""
+    """Compatibility wrapper for older callers."""
+    return await write_application_cover_letter(
+        resume_text=resume_text,
+        jd_text=jd_text,
+        role_title=role_title,
+        company_name=company_name,
+    )
+
+
+async def write_application_cover_letter(
+    resume_text: str,
+    jd_text: str,
+    role_title: str,
+    company_name: str,
+) -> tuple[str, str]:
+    """Gemini/Groq drafts a job-application cover letter. Returns (subject, body)."""
     if not settings.gemini_api_key and not settings.groq_api_key:
         raise ValueError("GEMINI_API_KEY or GROQ_API_KEY not configured")
 
     jd_block = f"Job description:\n{jd_text[:3000]}" if jd_text.strip() else \
-        "No job description available — pitch for the role title directly."
+        "No job description available; tailor to the role title directly."
 
     last_error = ""
     for attempt in range(2):
         strictness = "" if attempt == 0 else \
             f"\nYour previous draft was rejected: {last_error}. Fix that exactly."
-        prompt = f"""Write a short, direct cold email from a job seeker to {founder_name} ({founder_title}) at {company_name}, asking to be considered for the role of {role_title}.
+        prompt = f"""Write a concise cover letter for a job application to {company_name} for the role of {role_title}.
 
 Candidate resume:
 {resume_text[:4000]}
@@ -62,12 +77,14 @@ Candidate resume:
 {jd_block}
 
 Rules:
-- 120-180 words. Hard maximum 200 words.
-- Direct tone. First line states who the candidate is in one sentence.
-- 2-3 concrete proof points from the resume that map to the company's stack/needs.
-- Clear ask: consideration for the {role_title} role. Mention the resume is attached.
+- 250-380 words. Hard maximum 420 words.
+- Professional, direct tone.
+- First paragraph states role fit clearly.
+- Use 2-4 concrete proof points from the resume that map to the JD requirements.
+- Mention the company and role naturally.
+- Close with availability/interest in next steps.
 - NO filler: never open with pleasantries like "I hope this finds you well".
-- Address {founder_name} by first name.{strictness}
+- Do not invent degrees, employers, metrics, certifications, or tools not present in the resume/JD.{strictness}
 
 Answer in valid JSON only, no markdown fences:
 {{"subject": "...", "body": "..."}}"""

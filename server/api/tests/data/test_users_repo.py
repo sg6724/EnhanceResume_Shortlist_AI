@@ -6,7 +6,7 @@ async def test_get_by_email_found():
     sb = FakeSupabase()
     sb.tables["users"] = [{
         "id": "u1", "email": "a@b.com", "match_threshold": 0.6, "top_n": 5,
-        "timeout_minutes": 30, "max_compiler_retries": 3, "outreach_enabled": True,
+        "max_compiler_retries": 3, "outreach_enabled": True,
         "outreach_interval_hours": 24, "outreach_batch_size": 3,
     }]
     repo = UsersRepo(sb)
@@ -26,7 +26,7 @@ async def test_update_outreach_last_run():
     sb = FakeSupabase()
     sb.tables["users"] = [{
         "id": "u1", "email": "a@b.com", "match_threshold": 0.6, "top_n": 5,
-        "timeout_minutes": 30, "max_compiler_retries": 3, "outreach_enabled": True,
+        "max_compiler_retries": 3, "outreach_enabled": True,
         "outreach_interval_hours": 24, "outreach_batch_size": 3,
         "outreach_last_run_at": None,
     }]

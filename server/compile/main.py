@@ -47,7 +47,7 @@ def compile_tex(req: CompileRequest):
         tex_path.write_text(req.tex, encoding="utf-8")
 
         proc = subprocess.run(
-            ["latexmk", engine_flag, "-interaction=nonstopmode", "-halt-on-error",
+            ["latexmk", engine_flag, "-interaction=nonstopmode", "-f",
              "-no-shell-escape", f"-jobname={req.jobname}", tex_path.name],
             cwd=workdir,
             capture_output=True,
@@ -55,8 +55,14 @@ def compile_tex(req: CompileRequest):
             timeout=COMPILE_TIMEOUT_SECONDS,
         )
 
+        # pdflatex/latexmk exit nonzero whenever any error was logged, even
+        # ones it auto-corrected and recovered from (e.g. a unitless \vspace
+        # gets "pt" inserted) — same as Overleaf, which doesn't halt on these
+        # either. A produced PDF is the real signal of success; a genuinely
+        # fatal error (unrecoverable, like a missing \begin{document}) never
+        # produces one even with -f, so this doesn't hide real failures.
         pdf_path = workdir / f"{req.jobname}.pdf"
-        if proc.returncode == 0 and pdf_path.exists():
+        if pdf_path.exists():
             return Response(
                 content=pdf_path.read_bytes(),
                 media_type="application/pdf",

@@ -36,7 +36,12 @@ proc_app = App(
 
 
 @proc_app.task(name="scrape_and_process", queue="default", retry=3)
-async def scrape_and_process_task(user_id: str) -> None:
+async def scrape_and_process_task(
+    user_id: str,
+    career_urls: list[str] | None = None,
+    linkedin_urls: list[str] | None = None,
+    x_urls: list[str] | None = None,
+) -> None:
     import httpx
     from supabase import acreate_client
     from .agents.orchestrator import run_pipeline
@@ -44,7 +49,14 @@ async def scrape_and_process_task(user_id: str) -> None:
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
     http = httpx.AsyncClient(timeout=130.0)
     try:
-        result = await run_pipeline(user_id, sb, http)
+        result = await run_pipeline(
+            user_id,
+            sb,
+            http,
+            career_urls=career_urls,
+            linkedin_urls=linkedin_urls,
+            x_urls=x_urls,
+        )
         print(f"[task:scrape] {result}")
     finally:
         await http.aclose()
@@ -61,6 +73,21 @@ async def rewrite_resume_task(checkpoint_id: str) -> None:
     try:
         result = await run_rewrite(checkpoint_id, sb, http)
         print(f"[task:rewrite] {result}")
+    finally:
+        await http.aclose()
+
+
+@proc_app.task(name="run_manual_match", queue="default", retry=1)
+async def run_manual_match_task(jd_id: str) -> None:
+    import httpx
+    from supabase import acreate_client
+    from .agents.orchestrator import run_manual_match
+
+    sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    http = httpx.AsyncClient(timeout=150.0)
+    try:
+        result = await run_manual_match(jd_id, sb, http)
+        print(f"[task:manual_match] {result}")
     finally:
         await http.aclose()
 
@@ -103,9 +130,12 @@ async def outreach_tick(timestamp: int) -> None:
     from supabase import acreate_client
 
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
+    # Single-user app: settings.user_email identifies the one active account.
+    # Older/stale rows can linger in `users` after the configured email changes.
+    # Without this filter, every row gets an hourly application-prep cycle.
     users = await sb.table("users").select(
         "id, outreach_enabled, outreach_interval_hours, outreach_last_run_at"
-    ).execute()
+    ).eq("email", settings.user_email).execute()
     now = datetime.now(timezone.utc)
     for u in users.data:
         if not u.get("outreach_enabled", True):
@@ -117,3 +147,4 @@ async def outreach_tick(timestamp: int) -> None:
                 continue
         await run_outreach_task.defer_async(user_id=u["id"])
         print(f"[tick:outreach] queued cycle for {u['id']}")
+

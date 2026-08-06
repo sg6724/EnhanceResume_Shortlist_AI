@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
 import httpx
 from supabase import AsyncClient
 
 from ..config import settings
 from ..services.email import notify_batch_complete
+from ..services.pdf_storage import store_pdf
 from .scraper import scrape_jds
+from .jd_fetch import extract_jd_structured
 from .filter_agent import is_jd_relevant
 from .matcher import compute_match
 from .rewriter import rewrite_resume
 from .compiler import compile_with_retry
 
 
-async def _log(sb: AsyncClient, jd_id: str, agent: str, log: str, reasoning: str = "") -> None:
+async def _log(sb: AsyncClient, jd_id: str | None, agent: str, log: str, reasoning: str = "") -> None:
     await sb.table("agent_traces").insert({
         "jd_id": jd_id,
         "agent_name": agent,
@@ -23,7 +23,32 @@ async def _log(sb: AsyncClient, jd_id: str, agent: str, log: str, reasoning: str
     }).execute()
 
 
-async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -> dict:
+async def _upsert_match(sb: AsyncClient, row: dict) -> dict:
+    existing = await (
+        sb.table("jd_matches")
+        .select("id")
+        .eq("user_id", row["user_id"])
+        .eq("jd_id", row["jd_id"])
+        .eq("position_context", row["position_context"])
+        .maybe_single()
+        .execute()
+    )
+    if existing and existing.data:
+        res = await sb.table("jd_matches").update(row).eq("id", existing.data["id"]).execute()
+    else:
+        res = await sb.table("jd_matches").insert(row).execute()
+    return res.data[0]
+
+
+async def run_pipeline(
+    user_id: str,
+    sb: AsyncClient,
+    http: httpx.AsyncClient,
+    *,
+    career_urls: list[str] | None = None,
+    linkedin_urls: list[str] | None = None,
+    x_urls: list[str] | None = None,
+) -> dict:
     """
     Full pipeline: scrape → filter → match → create checkpoints.
     Top N are surfaced to the user; rest are auto-approved and queued.
@@ -65,11 +90,19 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             unique_kws.append(kw)
 
     print(f"[orchestrator] Scraping for: {unique_kws[:6]}")
-    jds = await scrape_jds(unique_kws)
+    await _log(sb, None, "scraper", f"Started scrape for: {', '.join(unique_kws[:6])}")
+    jds = await scrape_jds(
+        unique_kws,
+        http=http,
+        career_urls=career_urls,
+        linkedin_urls=linkedin_urls,
+        x_urls=x_urls,
+        log_event=lambda agent, log: _log(sb, None, agent, log),
+    )
     print(f"[orchestrator] Got {len(jds)} valid JDs")
+    await _log(sb, None, "scraper", f"Collected {len(jds)} valid jobs for matching")
 
     target_titles = [p["title"] for p in positions]
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=user["timeout_minutes"])
 
     # Process each JD
     above_threshold: list[tuple[float, dict, dict]] = []  # (score, jd_row, match_data)
@@ -82,6 +115,7 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             continue
 
         # Upsert JD record
+        extracted = await extract_jd_structured(jd["raw_text"])
         jd_ins = await sb.table("scraped_jds").upsert({
             "user_id": user_id,
             "source": jd["source"],
@@ -92,6 +126,12 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             "raw_text": jd["raw_text"],
             "relevance_confirmed": True,
             "dedup_hash": jd["dedup_hash"],
+            "role_title": extracted.role_title or jd["title"],
+            "seniority": extracted.seniority,
+            "responsibilities": extracted.responsibilities,
+            "must_have_skills": extracted.must_have_skills,
+            "nice_to_have_skills": extracted.nice_to_have_skills,
+            "tech_stack": extracted.tech_stack,
         }, on_conflict="dedup_hash").execute()
         jd_row = jd_ins.data[0]
         jd_id = jd_row["id"]
@@ -108,14 +148,26 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             else:
                 position_context = target_titles[0]
 
-            match_data = await compute_match(jd["raw_text"], master["plain_text_cache"], position_context)
-            match_ins = await sb.table("jd_matches").insert({
+            skill_terms = (
+                extracted.must_have_skills + extracted.nice_to_have_skills + extracted.tech_stack
+            )
+            match_data = await compute_match(
+                jd["raw_text"],
+                master["plain_text_cache"],
+                position_context,
+                skill_terms=skill_terms,
+                must_have_skills=extracted.must_have_skills,
+                nice_to_have_skills=extracted.nice_to_have_skills,
+                tech_stack=extracted.tech_stack,
+                seniority=extracted.seniority,
+                location=jd.get("location", ""),
+            )
+            match_row = await _upsert_match(sb, {
                 "jd_id": jd_id,
                 "user_id": user_id,
                 "position_context": position_context,
                 **match_data,
-            }).execute()
-            match_row = match_ins.data[0]
+            })
 
             await _log(sb, jd_id, "matcher",
                        f"Score: {match_data['composite_score']:.2f} | {position_context}",
@@ -144,7 +196,6 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             "user_id": user_id,
             "planned_diff": planned_diff,
             "status": "pending",
-            "expires_at": expires_at.isoformat(),
         }).execute()
         await _log(sb, jd_row["id"], "orchestrator",
                    f"Checkpoint created: {cp_ins.data[0]['id']}")
@@ -161,13 +212,18 @@ async def run_pipeline(user_id: str, sb: AsyncClient, http: httpx.AsyncClient) -
             "user_id": user_id,
             "planned_diff": planned_diff,
             "status": "approved",
-            "expires_at": expires_at.isoformat(),
         }).execute()
         cp_id = cp_ins.data[0]["id"]
         await rewrite_resume_task.defer_async(checkpoint_id=cp_id)
 
     total = len(above_threshold)
     notify_batch_complete(settings.user_email, total, zero_matches=(total == 0))
+    await _log(
+        sb,
+        None,
+        "orchestrator",
+        f"Finished scrape: {len(jds)} scraped, {total} above threshold, {len(top)} pending checkpoints",
+    )
 
     return {
         "total_scraped": len(jds),
@@ -264,11 +320,13 @@ async def run_rewrite(checkpoint_id: str, sb: AsyncClient, http: httpx.AsyncClie
     )
 
     status = "compiled" if pdf_bytes else "failed"
-    await sb.table("resume_copies").update({
-        "tex_content": final_tex,
-        "diff_patch": diff_summary,
-        "status": status,
-    }).eq("id", copy_id).execute()
+    updates = {"tex_content": final_tex, "diff_patch": diff_summary, "status": status}
+    if pdf_bytes:
+        try:
+            updates["pdf_storage_path"] = await store_pdf(sb, user_id, copy_id, pdf_bytes)
+        except Exception as e:
+            await _log(sb, jd_id, "compiler", f"PDF storage upload failed (non-fatal): {e}")
+    await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
 
     if pdf_bytes:
         await _log(sb, jd_id, "compiler", f"PDF compiled successfully ({len(pdf_bytes):,} bytes)")
@@ -276,3 +334,118 @@ async def run_rewrite(checkpoint_id: str, sb: AsyncClient, http: httpx.AsyncClie
         await _log(sb, jd_id, "compiler", f"FAILED after all retries", error_log[:1000])
 
     return {"copy_id": copy_id, "status": status}
+
+
+async def run_manual_match(jd_id: str, sb: AsyncClient, http: httpx.AsyncClient) -> dict:
+    """
+    On-demand score + rewrite + compile for one manually-submitted JD
+    (Quick Match). No checkpoint gate — the user already expressed
+    explicit intent by submitting this specific job. Mirrors run_rewrite's
+    rewrite -> compile -> store chain, preceded by scoring.
+    """
+    jd_res = await sb.table("scraped_jds").select("*").eq("id", jd_id).maybe_single().execute()
+    if not jd_res.data:
+        return {"error": "JD not found"}
+    jd = jd_res.data
+    user_id = jd["user_id"]
+
+    user_res = await sb.table("users").select("*").eq("id", user_id).maybe_single().execute()
+    if not user_res.data:
+        return {"error": "user not found"}
+    user = user_res.data
+
+    mr_res = await (
+        sb.table("master_resume").select("*").eq("user_id", user_id)
+        .order("version", desc=True).limit(1).execute()
+    )
+    if not mr_res.data:
+        return {"error": "no master resume"}
+    master = mr_res.data[0]
+
+    # Score — position context is the job's own title, no saved-Positions lookup
+    skill_terms = (
+        (jd.get("must_have_skills") or [])
+        + (jd.get("nice_to_have_skills") or [])
+        + (jd.get("tech_stack") or [])
+    )
+    match_data = await compute_match(
+        jd["raw_text"],
+        master["plain_text_cache"],
+        jd["title"],
+        skill_terms=skill_terms,
+        must_have_skills=jd.get("must_have_skills") or [],
+        nice_to_have_skills=jd.get("nice_to_have_skills") or [],
+        tech_stack=jd.get("tech_stack") or [],
+        seniority=jd.get("seniority"),
+        location=jd.get("location"),
+    )
+    match_row = await _upsert_match(sb, {
+        "jd_id": jd_id,
+        "user_id": user_id,
+        "position_context": jd["title"],
+        **match_data,
+    })
+    match_id = match_row["id"]
+    await _log(sb, jd_id, "matcher",
+               f"Score: {match_data['composite_score']:.2f} | {jd['title']}",
+               match_data.get("gap_analysis", ""))
+
+    # Straight to rewrite — no checkpoint
+    copy_ins = await sb.table("resume_copies").insert({
+        "jd_id": jd_id,
+        "user_id": user_id,
+        "master_resume_id": master["id"],
+        "status": "compiling",
+        "tex_content": master["tex_content"],
+    }).execute()
+    copy_id = copy_ins.data[0]["id"]
+
+    await _log(sb, jd_id, "rewriter", "Starting rewrite...")
+
+    try:
+        rewritten_tex, diff_summary = await rewrite_resume(
+            master_tex=master["tex_content"],
+            jd_text=jd["raw_text"],
+            gap_analysis=match_data.get("gap_analysis", ""),
+            position_context=jd["title"],
+        )
+    except ValueError as e:
+        await _log(sb, jd_id, "rewriter", f"Structure violation: {e}")
+        rewritten_tex = master["tex_content"]
+        diff_summary = f"Rewrite failed (structure violation): {e}"
+
+    await _log(sb, jd_id, "rewriter", diff_summary[:300], diff_summary)
+
+    async def rewriter_fn(current_tex: str, error_log: str, attempt: int) -> tuple[str, str]:
+        return await rewrite_resume(
+            master_tex=current_tex,
+            jd_text=jd["raw_text"],
+            gap_analysis=match_data.get("gap_analysis", ""),
+            position_context=jd["title"],
+            attempt=attempt,
+            previous_error=error_log,
+        )
+
+    pdf_bytes, final_tex, error_log = await compile_with_retry(
+        http=http,
+        tex=rewritten_tex,
+        rewriter_fn=rewriter_fn,
+        max_retries=user.get("max_compiler_retries", 3),
+        jd_info={"company": jd.get("company"), "title": jd.get("title")},
+    )
+
+    status = "compiled" if pdf_bytes else "failed"
+    updates = {"tex_content": final_tex, "diff_patch": diff_summary, "status": status}
+    if pdf_bytes:
+        try:
+            updates["pdf_storage_path"] = await store_pdf(sb, user_id, copy_id, pdf_bytes)
+        except Exception as e:
+            await _log(sb, jd_id, "compiler", f"PDF storage upload failed (non-fatal): {e}")
+    await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
+
+    if pdf_bytes:
+        await _log(sb, jd_id, "compiler", f"PDF compiled successfully ({len(pdf_bytes):,} bytes)")
+    else:
+        await _log(sb, jd_id, "compiler", f"FAILED after all retries", error_log[:1000])
+
+    return {"jd_id": jd_id, "match_id": match_id, "copy_id": copy_id, "status": status}

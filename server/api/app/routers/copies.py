@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from ..config import settings
 from ..compile_client import compile_tex
+from ..services.pdf_storage import fetch_pdf, store_pdf
 
 router = APIRouter(prefix="/copies", tags=["copies"])
 
@@ -44,6 +45,19 @@ async def get_copy(copy_id: str, request: Request):
     return res.data
 
 
+@router.get("/{copy_id}/pdf")
+async def get_copy_pdf(copy_id: str, request: Request):
+    sb = request.app.state.supabase
+    res = await sb.table("resume_copies").select("pdf_storage_path").eq("id", copy_id).maybe_single().execute()
+    if not res.data:
+        raise HTTPException(404, "copy not found")
+    path = res.data.get("pdf_storage_path")
+    if not path:
+        raise HTTPException(404, "no compiled PDF available for this copy yet")
+    pdf_bytes = await fetch_pdf(sb, path)
+    return Response(content=pdf_bytes, media_type="application/pdf")
+
+
 @router.patch("/{copy_id}/tex")
 async def update_tex(copy_id: str, body: TexUpdateIn, request: Request):
     """Manual edit — recompile only, no agent re-run."""
@@ -54,7 +68,13 @@ async def update_tex(copy_id: str, body: TexUpdateIn, request: Request):
 
     resp = await compile_tex(request.app.state.http, body.tex_content)
     if resp.status_code == 200:
-        await sb.table("resume_copies").update({"status": "compiled"}).eq("id", copy_id).execute()
+        updates = {"status": "compiled"}
+        cur = await sb.table("resume_copies").select("user_id").eq("id", copy_id).maybe_single().execute()
+        try:
+            updates["pdf_storage_path"] = await store_pdf(sb, cur.data["user_id"], copy_id, resp.content)
+        except Exception:
+            pass  # compile succeeded; PDF storage is best-effort, keep previous path if any
+        await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
         return {"status": "compiled"}
     await sb.table("resume_copies").update({"status": "failed"}).eq("id", copy_id).execute()
     return {"status": "failed", "log": resp.json().get("log", "")[:500]}

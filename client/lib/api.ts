@@ -19,6 +19,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export interface HealthResponse {
   status: string;
   db: boolean;
+  user_email: string;
 }
 
 export interface Stats {
@@ -26,6 +27,47 @@ export interface Stats {
   total_matches: number;
   total_copies: number;
   pending_checkpoints: number;
+}
+
+export interface JobActivity {
+  stats: Stats;
+  recent_jds: Array<{
+    id: string;
+    source: string;
+    company: string | null;
+    title: string;
+    location: string | null;
+    url: string | null;
+    scraped_at: string;
+  }>;
+  recent_matches: Array<{
+    id: string;
+    composite_score: number;
+    position_context: string;
+    created_at: string;
+    scraped_jds: { company: string | null; title: string; source: string } | null;
+  }>;
+  targets: Array<{
+    id: string;
+    company_name: string;
+    role_title: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string | null;
+  }>;
+  drafts: Array<{
+    id: string;
+    subject: string;
+    created_at: string;
+    outreach_targets: { company_name: string; role_title: string | null; status: string };
+  }>;
+  traces: Array<{
+    id: string;
+    jd_id: string | null;
+    agent_name: string;
+    log: string | null;
+    created_at: string;
+  }>;
 }
 
 export interface Position {
@@ -45,6 +87,8 @@ export interface JdMatch {
   llm_score: number;
   composite_score: number;
   gap_analysis: string;
+  matched_skills: string[];
+  missing_skills: string[];
   created_at: string;
   scraped_jds: {
     company: string;
@@ -53,6 +97,12 @@ export interface JdMatch {
     url: string;
     source: string;
     raw_text?: string;
+    role_title?: string | null;
+    seniority?: string | null;
+    responsibilities?: string[];
+    must_have_skills?: string[];
+    nice_to_have_skills?: string[];
+    tech_stack?: string[];
   };
 }
 
@@ -60,8 +110,7 @@ export interface Checkpoint {
   id: string;
   jd_id: string;
   planned_diff: string;
-  status: "pending" | "approved" | "rejected" | "timed_out";
-  expires_at: string;
+  status: "pending" | "approved" | "rejected";
   created_at: string;
   scraped_jds: { company: string; title: string };
 }
@@ -122,8 +171,16 @@ export interface OutreachDraft {
 }
 
 export interface OutreachQuota {
-  hunter_remaining: number;
-  hunter_limit: number;
+  apify_configured: boolean;
+  career_actor_configured: boolean;
+  linkedin_actor_configured: boolean;
+  x_actor_configured: boolean;
+}
+
+export interface ScrapeSources {
+  career_urls?: string[];
+  linkedin_urls?: string[];
+  x_urls?: string[];
 }
 
 export interface MasterResumeUploadResult {
@@ -133,11 +190,31 @@ export interface MasterResumeUploadResult {
   plain_text_chars: number;
 }
 
+export interface QuickMatchFetchResult {
+  company: string;
+  title: string;
+  jd_text: string;
+  source: "jsonld" | "llm_extracted";
+  possibly_closed: boolean;
+  role_title?: string | null;
+  seniority?: string | null;
+  responsibilities?: string[];
+  must_have_skills?: string[];
+  nice_to_have_skills?: string[];
+  tech_stack?: string[];
+}
+
+export interface QuickMatchStatus {
+  match: JdMatch | null;
+  copy: ResumeCopy | null;
+}
+
 // ── API client ─────────────────────────────────────────────────────────────
 
 export const api = {
   health: () => req<HealthResponse>("/health"),
   stats: () => req<Stats>("/jobs/stats"),
+  jobActivity: () => req<JobActivity>("/jobs/activity"),
 
   // Positions
   positions: () => req<Position[]>("/positions"),
@@ -152,8 +229,11 @@ export const api = {
     req<{ deleted: string }>(`/positions/${id}`, { method: "DELETE" }),
 
   // Jobs / scraping
-  triggerScrape: () =>
-    req<{ queued: boolean; user_id: string }>("/jobs/scrape", { method: "POST" }),
+  triggerScrape: (sources?: ScrapeSources) =>
+    req<{ queued: boolean; user_id: string; queued_at: string; sources: Record<string, number> }>("/jobs/scrape", {
+      method: "POST",
+      body: JSON.stringify(sources ?? {}),
+    }),
   jds: () => req<any[]>("/jobs"),
 
   // Matches
@@ -170,6 +250,7 @@ export const api = {
     }),
   markApplied: (id: string) =>
     req<ResumeCopy>(`/copies/${id}/apply`, { method: "PATCH" }),
+  copyPdfUrl: (id: string) => `${BASE}/copies/${id}/pdf`,
 
   // Checkpoints
   checkpoints: () => req<Checkpoint[]>("/checkpoints"),
@@ -211,9 +292,23 @@ export const api = {
       body: JSON.stringify({ subject, body }),
     }),
   approveDraft: (id: string) =>
-    req<{ queued: boolean }>(`/outreach/drafts/${id}/approve`, { method: "POST" }),
+    req<{ status: string }>(`/outreach/drafts/${id}/approve`, { method: "POST" }),
   rejectDraft: (id: string) =>
     req<{ status: string }>(`/outreach/drafts/${id}/reject`, { method: "POST" }),
   runOutreach: () => req<{ queued: boolean }>("/outreach/run", { method: "POST" }),
   outreachQuota: () => req<OutreachQuota>("/outreach/quota"),
+
+  // Quick Match
+  quickMatchFetchUrl: (url: string) =>
+    req<QuickMatchFetchResult>("/quick-match/fetch-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  quickMatchSubmit: (jd_text: string, company: string, title: string, source_url = "") =>
+    req<{ jd_id: string; queued: boolean }>("/quick-match", {
+      method: "POST",
+      body: JSON.stringify({ jd_text, company, title, source_url }),
+    }),
+  quickMatchStatus: (jdId: string) =>
+    req<QuickMatchStatus>(`/quick-match/${jdId}`),
 };
