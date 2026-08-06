@@ -92,59 +92,41 @@ async def run_manual_match_task(jd_id: str) -> None:
         await http.aclose()
 
 
-@proc_app.task(name="run_outreach", queue="default", retry=1)
-async def run_outreach_task(user_id: str) -> None:
+@proc_app.task(name="prepare_application", queue="default", retry=1)
+async def prepare_application_task(
+    run_id: str,
+    user_id: str,
+    career_urls: list[str] | None = None,
+    linkedin_urls: list[str] | None = None,
+    x_urls: list[str] | None = None,
+) -> None:
     import httpx
     from supabase import acreate_client
-    from .agents.outreach_orchestrator import run_outreach_cycle
+    from .agents.application_prep import run_application_prep
 
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
-    http = httpx.AsyncClient(timeout=60.0)
+    http = httpx.AsyncClient(timeout=280.0)
     try:
-        result = await run_outreach_cycle(user_id, sb, http)
-        print(f"[task:outreach] {result}")
+        result = await run_application_prep(
+            run_id, user_id, sb, http,
+            career_urls=career_urls or [], linkedin_urls=linkedin_urls or [], x_urls=x_urls or [],
+        )
+        print(f"[task:prepare_application] {result}")
     finally:
         await http.aclose()
 
 
-@proc_app.task(name="send_outreach_email", queue="default", retry=1)
-async def send_outreach_email_task(draft_id: str) -> None:
+@proc_app.task(name="retry_application_target", queue="default", retry=1)
+async def retry_application_target_task(target_id: str) -> None:
     import httpx
     from supabase import acreate_client
-    from .agents.outreach_orchestrator import send_outreach
+    from .agents.application_prep import retry_target
 
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
-    http = httpx.AsyncClient(timeout=130.0)
+    http = httpx.AsyncClient(timeout=150.0)
     try:
-        result = await send_outreach(draft_id, sb, http)
-        print(f"[task:outreach_send] {result}")
+        result = await retry_target(target_id, sb, http)
+        print(f"[task:retry_target] {result}")
     finally:
         await http.aclose()
-
-
-@proc_app.periodic(cron="0 * * * *")
-@proc_app.task(name="outreach_tick", queue="default")
-async def outreach_tick(timestamp: int) -> None:
-    """Hourly tick: run an outreach cycle for each user whose interval elapsed."""
-    from datetime import datetime, timedelta, timezone
-    from supabase import acreate_client
-
-    sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
-    # Single-user app: settings.user_email identifies the one active account.
-    # Older/stale rows can linger in `users` after the configured email changes.
-    # Without this filter, every row gets an hourly application-prep cycle.
-    users = await sb.table("users").select(
-        "id, outreach_enabled, outreach_interval_hours, outreach_last_run_at"
-    ).eq("email", settings.user_email).execute()
-    now = datetime.now(timezone.utc)
-    for u in users.data:
-        if not u.get("outreach_enabled", True):
-            continue
-        last = u.get("outreach_last_run_at")
-        if last:
-            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
-            if now - last_dt < timedelta(hours=u.get("outreach_interval_hours", 24)):
-                continue
-        await run_outreach_task.defer_async(user_id=u["id"])
-        print(f"[tick:outreach] queued cycle for {u['id']}")
 
