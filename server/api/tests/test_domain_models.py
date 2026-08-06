@@ -1,5 +1,6 @@
 from app.domain.models import (
     AgentTrace,
+    ApplicationRun,
     Checkpoint,
     Contact,
     CompileResult,
@@ -65,15 +66,24 @@ def test_resume_copy_defaults():
 
 def test_outreach_target_defaults():
     t = OutreachTarget(id="t1", company_name="Acme")
-    assert t.status == "pending"
-    assert t.source == "watchlist"
+    assert t.status == "drafted"
+    assert t.source == "career_page"
     assert t.attempts == 0
 
 
-def test_outreach_draft_requires_target_subject_body():
+def test_outreach_draft_defaults():
     d = OutreachDraft(id="d1", target_id="t1", subject="Hi", body="Body text")
-    assert d.sent_at is None
-    assert d.send_error is None
+    assert d.edited_subject is None
+    assert d.resume_copy_id is None
+
+
+def test_application_run_defaults():
+    r = ApplicationRun(id="r1", user_id="u1")
+    assert r.status == "running"
+    assert r.jds_found == 0
+    assert r.jds_done == 0
+    assert r.targets_drafted == 0
+    assert r.targets_failed == 0
 
 
 def test_agent_trace_minimal():

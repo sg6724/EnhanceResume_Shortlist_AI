@@ -77,15 +77,10 @@ class OutreachTarget(BaseModel):
     user_id: str | None = None
     company_name: str
     company_domain: str | None = None
-    source: str = "watchlist"
+    source: str = "career_page"
     jd_id: str | None = None
     role_title: str | None = None
-    status: str = "pending"
-    founder_name: str | None = None
-    founder_title: str | None = None
-    founder_email: str | None = None
-    email_confidence: str | None = None
-    contact_method: str | None = None
+    status: str = "drafted"
     failure_reason: str | None = None
     attempts: int = 0
     created_at: datetime | None = None
@@ -100,10 +95,23 @@ class OutreachDraft(BaseModel):
     edited_subject: str | None = None
     edited_body: str | None = None
     resume_copy_id: str | None = None
-    sent_at: datetime | None = None
-    resend_message_id: str | None = None
-    send_error: str | None = None
     created_at: datetime | None = None
+
+
+class ApplicationRun(BaseModel):
+    id: str
+    user_id: str | None = None
+    status: str = "running"
+    career_urls: list[str] = []
+    linkedin_urls: list[str] = []
+    x_urls: list[str] = []
+    jds_found: int = 0
+    jds_done: int = 0
+    targets_drafted: int = 0
+    targets_failed: int = 0
+    error: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class AgentTrace(BaseModel):
