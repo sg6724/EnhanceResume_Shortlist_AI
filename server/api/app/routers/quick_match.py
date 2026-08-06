@@ -105,7 +105,22 @@ async def status(jd_id: str, request: Request):
         sb.table("resume_copies").select("*, scraped_jds(company, title)").eq("jd_id", jd_id)
         .order("created_at", desc=True).limit(1).execute()
     )
+    target_res = await (
+        sb.table("outreach_targets").select("id").eq("jd_id", jd_id)
+        .order("created_at", desc=True).limit(1).execute()
+    )
+    draft = None
+    if target_res.data:
+        draft_res = await (
+            sb.table("outreach_drafts").select("*, outreach_targets(*)")
+            .eq("target_id", target_res.data[0]["id"])
+            .order("created_at", desc=True).limit(1).execute()
+        )
+        if draft_res.data:
+            draft = draft_res.data[0]
+
     return {
         "match": match_res.data[0] if match_res.data else None,
         "copy": copy_res.data[0] if copy_res.data else None,
+        "draft": draft,
     }
