@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api, type JdMatch } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { SketchArrow } from "@/components/ui/Doodles";
 import clsx from "clsx";
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
@@ -43,7 +45,8 @@ export default function MatchesPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <PageHeader
-        title="Job Matches"
+        title="Job"
+        titleEmphasis="Matches"
         description="JDs ranked by composite match score (BM25 30% + semantic 30% + Gemini LLM 40%)."
       />
 
@@ -52,9 +55,10 @@ export default function MatchesPage() {
       )}
 
       {!loading && matches.length === 0 && (
-        <div className="text-center py-16 text-muted text-sm">
+        <div className="text-center py-16 text-muted text-sm flex flex-col items-center gap-2">
+          <SketchArrow className="w-16 h-8 text-muted/50 -scale-y-100" />
           No matches yet. Run a scraping batch from the{" "}
-          <a href="/" className="text-accent hover:underline">Dashboard</a>.
+          <a href="/dashboard" className="text-accent hover:underline">Dashboard</a>.
         </div>
       )}
 
@@ -108,6 +112,28 @@ export default function MatchesPage() {
                   Gap Analysis
                 </div>
                 {m.gap_analysis}
+              </div>
+            )}
+
+            {/* Matched / Missing skills */}
+            {Boolean(m.matched_skills?.length || m.missing_skills?.length) && (
+              <div className="flex flex-wrap gap-4">
+                {m.matched_skills?.length ? (
+                  <div className="flex-1 min-w-[12rem]">
+                    <div className="text-[10px] uppercase tracking-wider text-ok mb-1 font-medium">Matched</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.matched_skills.map((s) => <Badge key={s} tone="ok">{s}</Badge>)}
+                    </div>
+                  </div>
+                ) : null}
+                {m.missing_skills?.length ? (
+                  <div className="flex-1 min-w-[12rem]">
+                    <div className="text-[10px] uppercase tracking-wider text-bad mb-1 font-medium">Missing</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.missing_skills.map((s) => <Badge key={s} tone="bad">{s}</Badge>)}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
 

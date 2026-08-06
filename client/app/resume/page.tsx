@@ -57,7 +57,8 @@ export default function ResumePage() {
   return (
     <div className="max-w-3xl space-y-8">
       <PageHeader
-        title="Master Resume"
+        title="Master"
+        titleEmphasis="Resume"
         description="Your LaTeX source of truth. Agents fork from this — they never modify it directly. Uploading a new version marks existing copies as stale."
       />
 

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { api, type QuickMatchStatus } from "@/lib/api";
+import { api, type QuickMatchStatus, type QuickMatchFetchResult } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +20,7 @@ export default function QuickMatchPage() {
   const [possiblyClosed, setPossiblyClosed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<QuickMatchStatus | null>(null);
+  const [extracted, setExtracted] = useState<QuickMatchFetchResult | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function QuickMatchPage() {
       setCompany(res.company);
       setTitle(res.title);
       setPossiblyClosed(res.possibly_closed);
+      setExtracted(res);
       setStage("reviewing");
     } catch (e: any) {
       setError(e.message);
@@ -88,7 +90,8 @@ export default function QuickMatchPage() {
   return (
     <div className="space-y-8 max-w-4xl">
       <PageHeader
-        title="Quick Match"
+        title="Quick"
+        titleEmphasis="Match"
         description="Score your resume against one specific job — via its posting URL or pasted JD text — and get a tailored, compiled resume immediately."
       />
 
@@ -167,6 +170,38 @@ export default function QuickMatchPage() {
               <Label htmlFor="qm-jdtext">Job description</Label>
               <Textarea id="qm-jdtext" value={jdText} onChange={(e) => setJdText(e.target.value)} rows={14} />
             </div>
+            {extracted && (extracted.must_have_skills?.length || extracted.tech_stack?.length || extracted.responsibilities?.length) ? (
+              <div className="space-y-2 rounded-xl border border-border p-3">
+                <div className="text-xs font-medium text-muted">Extracted from posting</div>
+                {extracted.must_have_skills?.length ? (
+                  <div>
+                    <div className="text-xs text-muted">Must-have skills</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {extracted.must_have_skills.map((s) => <Badge key={s} tone="accent">{s}</Badge>)}
+                    </div>
+                  </div>
+                ) : null}
+                {extracted.tech_stack?.length ? (
+                  <div>
+                    <div className="text-xs text-muted">Tech stack</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {extracted.tech_stack.map((s) => <Badge key={s} tone="accent">{s}</Badge>)}
+                    </div>
+                  </div>
+                ) : null}
+                {extracted.responsibilities?.length ? (
+                  <div>
+                    <div className="text-xs text-muted">Responsibilities</div>
+                    <ul className="list-disc list-inside text-xs text-text mt-1 space-y-0.5">
+                      {extracted.responsibilities.slice(0, 6).map((r, i) => <li key={i}>{r}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
+                {extracted.seniority ? (
+                  <div className="text-xs text-muted">Seniority: {extracted.seniority}</div>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex justify-between">
               <Button variant="ghost" onClick={reset}>Start over</Button>
               <Button onClick={runMatch}>Run Match</Button>
@@ -198,6 +233,22 @@ export default function QuickMatchPage() {
                   </span>
                 </div>
                 <div className="text-sm text-text whitespace-pre-wrap">{status.match.gap_analysis}</div>
+                {status.match.matched_skills?.length ? (
+                  <div>
+                    <div className="text-xs text-muted">Matched skills</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {status.match.matched_skills.map((s) => <Badge key={s} tone="ok">{s}</Badge>)}
+                    </div>
+                  </div>
+                ) : null}
+                {status.match.missing_skills?.length ? (
+                  <div>
+                    <div className="text-xs text-muted">Missing skills</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {status.match.missing_skills.map((s) => <Badge key={s} tone="bad">{s}</Badge>)}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
 

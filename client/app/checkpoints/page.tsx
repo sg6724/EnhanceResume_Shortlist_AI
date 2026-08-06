@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SketchArrow } from "@/components/ui/Doodles";
 
 export default function CheckpointsPage() {
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
@@ -107,7 +108,8 @@ export default function CheckpointsPage() {
       )}
 
       {!loading && checkpoints.length === 0 && (
-        <div className="text-center py-16 text-muted text-sm">
+        <div className="text-center py-16 text-muted text-sm flex flex-col items-center gap-2">
+          <SketchArrow className="w-16 h-8 text-muted/50 -scale-y-100" />
           No checkpoints yet. Run a scraping batch to generate some.
         </div>
       )}

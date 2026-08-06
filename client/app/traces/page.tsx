@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, type Trace } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { SketchArrow } from "@/components/ui/Doodles";
 import clsx from "clsx";
 
 const AGENT_STYLE: Record<string, string> = {
@@ -45,7 +46,8 @@ export default function TracesPage() {
   return (
     <div className="max-w-4xl space-y-8">
       <PageHeader
-        title="Observability"
+        title="Agent"
+        titleEmphasis="Observability"
         description="Real-time agent trace log. Auto-refreshes every 5 s."
       />
 
@@ -66,7 +68,8 @@ export default function TracesPage() {
       )}
 
       {!loading && traces.length === 0 && (
-        <div className="text-center py-16 text-muted text-sm">
+        <div className="text-center py-16 text-muted text-sm flex flex-col items-center gap-2">
+          <SketchArrow className="w-16 h-8 text-muted/50 -scale-y-100" />
           No traces yet. Run the pipeline to see agent activity here.
         </div>
       )}

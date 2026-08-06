@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import { SketchArrow } from "@/components/ui/Doodles";
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -40,7 +41,8 @@ export default function PositionsPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <PageHeader
-        title="Target Positions"
+        title="Target"
+        titleEmphasis="Positions"
         description="The job titles the scraper searches for. Add fuzzy keywords to catch semantically related roles."
       />
 
@@ -79,7 +81,8 @@ export default function PositionsPage() {
       {/* List */}
       <div className="space-y-2">
         {positions.length === 0 && (
-          <div className="text-center py-16 text-muted text-sm">
+          <div className="text-center py-16 text-muted text-sm flex flex-col items-center gap-2">
+            <SketchArrow className="w-16 h-8 text-muted/50 -scale-y-100" />
             No positions yet. Add one above to start scraping.
           </div>
         )}

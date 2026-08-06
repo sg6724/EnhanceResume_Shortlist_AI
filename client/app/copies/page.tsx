@@ -59,11 +59,13 @@ export default function CopiesPage() {
   };
 
   return (
-    <div className="flex gap-5 h-[calc(100vh-4rem)]">
+    <div className="flex gap-5 h-[calc(100vh-7rem)]">
       {/* Sidebar list */}
       <div className="w-[17rem] flex-shrink-0 overflow-y-auto space-y-1">
         <div className="mb-4">
-          <h1 className="text-xl font-bold tracking-tight text-text">Resume Copies</h1>
+          <h1 className="font-display text-2xl tracking-tight text-text">
+            Resume <em className="italic">Copies</em>
+          </h1>
           <p className="text-muted text-xs mt-0.5">Select to view or edit.</p>
         </div>
 
