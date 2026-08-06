@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     apify_linkedin_urls: str = ""
     apify_x_urls: str = ""
 
-    user_email: str = "tecmaths4mumbai@gmail.com"
+    user_email: str = "samriddhigupta426@gmail.com"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     @property

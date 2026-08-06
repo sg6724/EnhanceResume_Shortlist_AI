@@ -54,7 +54,7 @@ services:
       - key: APIFY_X_URLS
         sync: false
       - key: USER_EMAIL
-        value: tecmaths4mumbai@gmail.com
+        value: samriddhigupta426@gmail.com
       - key: CORS_ORIGINS
         value: http://localhost:3000,http://127.0.0.1:3000
       - key: COMPILE_SERVICE_HOSTPORT
