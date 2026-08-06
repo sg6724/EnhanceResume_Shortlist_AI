@@ -6,8 +6,10 @@ import re
 from typing import Any
 
 import aiohttp
+import httpx
 
 from ..config import settings
+from ..integrations.jobs.apify import fetch_apify_jobs
 
 # Max candidate JDs kept after dedup/validation. Each candidate later costs
 # several (free-tier, rate-limited) Gemini calls in the filter+match stages,
@@ -127,24 +129,59 @@ async def _fetch_adzuna(keywords: list[str]) -> list[dict[str, Any]]:
     return results
 
 
-def dedup_hash(company: str, title: str, location: str) -> str:
-    key = f"{company}|{title}|{location}".lower().strip()
+def dedup_hash(company: str, title: str, location: str, url: str = "", content_hash: str = "") -> str:
+    key = (url or content_hash or f"{company}|{title}|{location}").lower().strip()
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-async def scrape_jds(keywords: list[str]) -> list[dict[str, Any]]:
+async def scrape_jds(
+    keywords: list[str],
+    *,
+    http: httpx.AsyncClient | None = None,
+    career_urls: list[str] | None = None,
+    linkedin_urls: list[str] | None = None,
+    x_urls: list[str] | None = None,
+    log_event: Any | None = None,
+) -> list[dict[str, Any]]:
     """
-    Fetch JDs from all sources, deduplicate on (company+title+location),
-    and validate minimum text length.
+    Fetch JDs from all sources, deduplicate on stable source URL/content hash
+    where possible, and validate minimum text length.
     """
     raw: list[dict[str, Any]] = []
-    raw.extend(await _fetch_remoteok(keywords))
-    raw.extend(await _fetch_adzuna(keywords))
+    explicit_sources = bool(career_urls or linkedin_urls or x_urls)
+    if not explicit_sources:
+        remoteok = await _fetch_remoteok(keywords)
+        raw.extend(remoteok)
+        if log_event:
+            await log_event("scraper", f"RemoteOK returned {len(remoteok)} candidate jobs")
+        adzuna = await _fetch_adzuna(keywords)
+        raw.extend(adzuna)
+        if log_event:
+            await log_event("scraper", f"Adzuna returned {len(adzuna)} candidate jobs")
+    elif log_event:
+        await log_event("scraper", "Using only the source URLs entered on this page")
+    if http is not None:
+        apify_jobs = await fetch_apify_jobs(
+            http,
+            keywords,
+            career_urls=career_urls,
+            linkedin_urls=linkedin_urls,
+            x_urls=x_urls,
+        )
+        raw.extend(apify_jobs)
+        if log_event:
+            await log_event("scraper", f"Apify returned {len(apify_jobs)} candidate jobs")
 
     seen: set[str] = set()
     valid: list[dict[str, Any]] = []
     for job in raw:
-        h = dedup_hash(job["company"], job["title"], job.get("location", ""))
+        h = dedup_hash(
+            job["company"],
+            job["title"],
+            job.get("location", ""),
+            job.get("url", ""),
+            job.get("content_hash", ""),
+        )
         if h in seen:
             continue
         seen.add(h)
@@ -165,4 +202,6 @@ async def scrape_jds(keywords: list[str]) -> list[dict[str, Any]]:
     capped = valid[:MAX_CANDIDATES]
 
     print(f"[scraper] {len(raw)} raw → {len(valid)} valid → {len(capped)} kept (cap {MAX_CANDIDATES})")
+    if log_event:
+        await log_event("scraper", f"{len(raw)} raw jobs, {len(valid)} valid, {len(capped)} kept")
     return capped

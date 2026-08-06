@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from google import genai
 from groq import AsyncGroq
 
@@ -18,6 +20,17 @@ from ..config import settings
 # stable asyncio loop, so a per-process singleton is safe.
 _client: genai.Client | None = None
 _groq_client: AsyncGroq | None = None
+_RETRY_DELAYS = (1.0, 4.0, 12.0)
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text or "resource_exhausted" in text
+
+
+def _short_error(exc: Exception) -> str:
+    text = " ".join(str(exc).replace("\n", " ").split())
+    return text[:500]
 
 
 def get_client() -> genai.Client:
@@ -56,23 +69,33 @@ async def generate(prompt: str, *, gemini_model: str, groq_model: str) -> str:
     errors: list[str] = []
 
     if settings.gemini_api_key:
-        try:
-            resp = await get_client().aio.models.generate_content(model=gemini_model, contents=prompt)
-            return resp.text or ""
-        except Exception as e:
-            errors.append(f"gemini: {e}")
+        for attempt, delay in enumerate((0.0, *_RETRY_DELAYS), start=1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                resp = await get_client().aio.models.generate_content(model=gemini_model, contents=prompt)
+                return resp.text or ""
+            except Exception as e:
+                if not _is_rate_limit(e) or attempt == len(_RETRY_DELAYS) + 1:
+                    errors.append(f"gemini: {_short_error(e)}")
+                    break
     else:
         errors.append("gemini: no GEMINI_API_KEY")
 
     if settings.groq_api_key:
-        try:
-            resp = await get_groq_client().chat.completions.create(
-                model=groq_model,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return resp.choices[0].message.content or ""
-        except Exception as e:
-            errors.append(f"groq: {e}")
+        for attempt, delay in enumerate((0.0, *_RETRY_DELAYS), start=1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                resp = await get_groq_client().chat.completions.create(
+                    model=groq_model,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                if not _is_rate_limit(e) or attempt == len(_RETRY_DELAYS) + 1:
+                    errors.append(f"groq: {_short_error(e)}")
+                    break
     else:
         errors.append("groq: no GROQ_API_KEY")
 

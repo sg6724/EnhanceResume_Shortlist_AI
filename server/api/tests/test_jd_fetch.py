@@ -121,6 +121,30 @@ async def test_fetch_jd_from_url_uses_jsonld_path(monkeypatch):
     assert result["possibly_closed"] is False
 
 
+async def test_fetch_jd_from_url_detects_closure_from_stale_jsonld_page():
+    """JSON-LD metadata can be stale — a closed posting's JobPosting block
+    still describes the original opening, but the live page chrome shows
+    a 'this job has been filled' banner. possibly_closed must catch this
+    even though the closure text never appears inside the description
+    field itself (regression test for a real GE HealthCare career page)."""
+    html = JOBPOSTING_HTML.replace(
+        "<p>Some rendered page chrome, nav links, cookie banner.</p>",
+        "<p>Sorry, the job you are trying to apply for has been filled.</p>",
+    )
+
+    class FakeResponse:
+        status_code = 200
+        text = html
+
+    class FakeHttp:
+        async def get(self, url, **kwargs):
+            return FakeResponse()
+
+    result = await jd_fetch.fetch_jd_from_url(FakeHttp(), "https://example.com/job/1")
+    assert result["source"] == "jsonld"
+    assert result["possibly_closed"] is True
+
+
 async def test_fetch_jd_from_url_falls_back_to_llm(monkeypatch):
     class FakeResponse:
         status_code = 200

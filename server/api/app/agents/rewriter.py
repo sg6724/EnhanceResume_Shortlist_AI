@@ -46,6 +46,7 @@ ABSOLUTE RULES — breaking any of these means the output is invalid:
 2. NEVER change the document preamble (\\documentclass, \\usepackage, etc.).
 3. Use ONLY LaTeX commands that are valid with the existing packages.
 4. Return ONLY the complete modified .tex file, then on a new line write "DIFF:" followed by a brief bullet summary.
+5. TRUTHFULNESS: ONLY use skills, employers, job titles, degrees, certifications, projects, and metrics that ALREADY appear in the MASTER RESUME. Never invent, fabricate, exaggerate, or add any experience, employer, role, degree, certification, tool, framework, programming language, or quantifiable metric (e.g. "improved X by 40%") that is not present in the master resume. To address a JD requirement you lack, rephrase or emphasize EXISTING experience - never create new claims.
 
 Target position: {position_context}
 
@@ -75,6 +76,14 @@ Master resume (ONLY edit content inside existing environments):
     if rewritten.startswith("```"):
         rewritten = re.sub(r"^```[a-zA-Z]*\n?", "", rewritten)
         rewritten = re.sub(r"\n?```$", "", rewritten.strip())
+
+    # Strip any conversational preamble the model prepended before the tex
+    # (e.g. "Here is the modified resume:") — pdflatex fails with "Missing
+    # \begin{document}" on stray text before \documentclass, even though it
+    # doesn't change the environment set the check below looks for.
+    doc_start = rewritten.find("\\documentclass")
+    if doc_start > 0:
+        rewritten = rewritten[doc_start:]
 
     # Validate: LaTeX environment structure must be unchanged
     orig_envs = _extract_environments(master_tex)

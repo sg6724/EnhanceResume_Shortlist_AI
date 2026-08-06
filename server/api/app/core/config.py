@@ -27,6 +27,16 @@ class ContactsSettings(BaseModel):
     adzuna_api_key: str = ""
 
 
+class ApifySettings(BaseModel):
+    api_token: str = ""
+    career_actor_id: str = "apify/website-content-crawler"
+    linkedin_actor_id: str = ""
+    x_actor_id: str = ""
+    career_urls: str = ""
+    linkedin_urls: str = ""
+    x_urls: str = ""
+
+
 class CompileSettings(BaseModel):
     compile_service_url: str = "http://localhost:8001"
 
@@ -49,6 +59,14 @@ class Settings(BaseSettings):
 
     adzuna_app_id: str = ""
     adzuna_api_key: str = ""
+
+    apify_api_token: str = ""
+    apify_career_actor_id: str = "apify/website-content-crawler"
+    apify_linkedin_actor_id: str = ""
+    apify_x_actor_id: str = ""
+    apify_career_urls: str = ""
+    apify_linkedin_urls: str = ""
+    apify_x_urls: str = ""
 
     user_email: str = "tecmaths4mumbai@gmail.com"
 
@@ -75,6 +93,18 @@ class Settings(BaseSettings):
             apollo_api_key=self.apollo_api_key,
             adzuna_app_id=self.adzuna_app_id,
             adzuna_api_key=self.adzuna_api_key,
+        )
+
+    @property
+    def apify(self) -> ApifySettings:
+        return ApifySettings(
+            api_token=self.apify_api_token,
+            career_actor_id=self.apify_career_actor_id,
+            linkedin_actor_id=self.apify_linkedin_actor_id,
+            x_actor_id=self.apify_x_actor_id,
+            career_urls=self.apify_career_urls,
+            linkedin_urls=self.apify_linkedin_urls,
+            x_urls=self.apify_x_urls,
         )
 
     @property

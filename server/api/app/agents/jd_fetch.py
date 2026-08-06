@@ -6,12 +6,15 @@ from html import unescape
 
 import httpx
 from bs4 import BeautifulSoup
+from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..services.llm import generate
+from ..services.llm import generate, get_client
 
 _MODEL = "gemini-2.0-flash"
-_GROQ_MODEL = "llama-3.1-8b-instant"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
+# url_context requires 2.5-flash — not available on 2.0-flash.
+_URL_CONTEXT_MODEL = "gemini-2.5-flash"
 
 _JSONLD_RE = re.compile(
     r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
@@ -112,8 +115,47 @@ If you cannot find a real job posting in this text, return {{"company": "", "tit
         return empty
 
 
-async def fetch_jd_from_url(http: httpx.AsyncClient, url: str) -> dict:
-    """Fetch a job posting URL and extract company/title/JD text.
+async def _fetch_via_url_context(url: str) -> dict:
+    """Fallback fetch using Gemini's url_context server-side tool.
+
+    url_context is still a server-side fetcher, not a real browser — sites
+    with real anti-bot fingerprinting (LinkedIn) block it the same way they
+    block a plain httpx GET. This only helps sites that reject generic
+    scripted requests without full bot detection (many ATS/career pages).
+    Returns {"company", "title", "jd_text"}, all empty on any failure.
+    """
+    empty = {"company": "", "title": "", "jd_text": ""}
+    if not settings.gemini_api_key:
+        return empty
+    from google.genai.types import GenerateContentConfig
+
+    prompt = f"""Fetch the job posting at this URL and extract its details: {url}
+Ignore site boilerplate: cookie notices, login/signup prompts, navigation menus.
+
+Answer in valid JSON only, no markdown fences:
+{{"company": "company name", "title": "job title", "jd_text": "the full job description and requirements, cleaned of boilerplate"}}
+If you cannot access the page or find no real job posting, return {{"company": "", "title": "", "jd_text": ""}}."""
+    try:
+        resp = await get_client().aio.models.generate_content(
+            model=_URL_CONTEXT_MODEL,
+            contents=prompt,
+            config=GenerateContentConfig(tools=[{"url_context": {}}]),
+        )
+        text = (resp.text or "").strip().strip("```json").strip("```").strip()
+        data = json.loads(text)
+        return {
+            "company": data.get("company") or "",
+            "title": data.get("title") or "",
+            "jd_text": data.get("jd_text") or "",
+        }
+    except Exception as e:
+        print(f"[jd_fetch] url_context fetch error: {e}")
+        return empty
+
+
+async def _fetch_via_httpx(http: httpx.AsyncClient, url: str) -> dict:
+    """Fetch a job posting URL and extract company/title/JD text via a plain
+    HTTP GET.
 
     Tries a JobPosting JSON-LD block first (free, covers most ATS
     platforms); falls back to visible-text + one LLM extraction call
@@ -132,12 +174,27 @@ async def fetch_jd_from_url(http: httpx.AsyncClient, url: str) -> dict:
     html_text = resp.text
     posting = _extract_jsonld_jobposting(html_text)
     if posting and posting.get("description"):
+        # JSON-LD metadata can be stale (a closed/filled posting's JSON-LD
+        # still describes the original opening) — the "this job has been
+        # filled" banner only shows up in the page's live rendered chrome,
+        # not in the description field itself, so check both.
+        possibly_closed = (
+            _detect_closed_posting(posting["description"])
+            or _detect_closed_posting(_extract_visible_text(html_text, max_chars=1000))
+        )
+        struct = await extract_jd_structured(posting["description"])
         return {
             "company": posting["company"],
             "title": posting["title"],
             "jd_text": posting["description"],
             "source": "jsonld",
-            "possibly_closed": _detect_closed_posting(posting["description"]),
+            "possibly_closed": possibly_closed,
+            "role_title": struct.role_title or posting["title"],
+            "seniority": struct.seniority,
+            "responsibilities": struct.responsibilities,
+            "must_have_skills": struct.must_have_skills,
+            "nice_to_have_skills": struct.nice_to_have_skills,
+            "tech_stack": struct.tech_stack,
         }
 
     visible_text = _extract_visible_text(html_text)
@@ -148,10 +205,123 @@ async def fetch_jd_from_url(http: httpx.AsyncClient, url: str) -> dict:
     if not extracted["jd_text"]:
         return {"error": "could not find a job description on that page — try pasting the JD text directly"}
 
+    struct = await extract_jd_structured(extracted["jd_text"])
     return {
         "company": extracted["company"],
         "title": extracted["title"],
         "jd_text": extracted["jd_text"],
         "source": "llm_extracted",
         "possibly_closed": _detect_closed_posting(visible_text),
+        "role_title": struct.role_title or extracted["title"],
+        "seniority": struct.seniority,
+        "responsibilities": struct.responsibilities,
+        "must_have_skills": struct.must_have_skills,
+        "nice_to_have_skills": struct.nice_to_have_skills,
+        "tech_stack": struct.tech_stack,
     }
+
+
+async def fetch_jd_from_url(http: httpx.AsyncClient, url: str) -> dict:
+    """Fetch a job posting URL and extract company/title/JD text.
+
+    Tries a plain HTTP GET first (JSON-LD, then visible-text + LLM
+    extraction — see `_fetch_via_httpx`). If that fails outright, falls back
+    to Gemini's url_context tool, which fetches server-side and succeeds on
+    some sites a generic scripted GET gets blocked on (though not on sites
+    with real anti-bot fingerprinting, like LinkedIn — see
+    `_fetch_via_url_context`).
+
+    Returns {"company", "title", "jd_text", "source", "possibly_closed", ...}
+    on success, or {"error": str} if every path fails.
+    """
+    result = await _fetch_via_httpx(http, url)
+    if "error" not in result:
+        return result
+
+    httpx_error = result["error"]
+    fallback = await _fetch_via_url_context(url)
+    if not fallback["jd_text"]:
+        return {"error": httpx_error}
+
+    struct = await extract_jd_structured(fallback["jd_text"])
+    return {
+        "company": fallback["company"],
+        "title": fallback["title"],
+        "jd_text": fallback["jd_text"],
+        "source": "url_context",
+        "possibly_closed": _detect_closed_posting(fallback["jd_text"]),
+        "role_title": struct.role_title or fallback["title"],
+        "seniority": struct.seniority,
+        "responsibilities": struct.responsibilities,
+        "must_have_skills": struct.must_have_skills,
+        "nice_to_have_skills": struct.nice_to_have_skills,
+        "tech_stack": struct.tech_stack,
+    }
+
+
+class ExtractedJD(BaseModel):
+    """Structured, normalized job description per the platform spec.
+
+    Mirrors the spec's extraction schema: company, role_title, seniority,
+    responsibilities, must_have_skills, nice_to_have_skills, tech_stack, and the
+    raw text. All fields have safe defaults so a failed/empty extraction never
+    crashes the caller (Python equivalent of the spec's zod/joi validation).
+    """
+
+    company: str = ""
+    role_title: str = ""
+    seniority: str = ""
+    responsibilities: list[str] = Field(default_factory=list)
+    must_have_skills: list[str] = Field(default_factory=list)
+    nice_to_have_skills: list[str] = Field(default_factory=list)
+    tech_stack: list[str] = Field(default_factory=list)
+    raw_jd_text: str = ""
+
+
+async def extract_jd_structured(raw_jd_text: str) -> ExtractedJD:
+    """Extract the structured JD schema from raw JD text via one Gemini call.
+
+    Returns an ``ExtractedJD`` with sane defaults on any failure (no API key,
+    malformed JSON, network error) so callers can persist gracefully. Only
+    includes skills/technologies explicitly stated in the JD.
+    """
+    if not settings.gemini_api_key and not settings.groq_api_key:
+        return ExtractedJD(raw_jd_text=raw_jd_text or "")
+    if not raw_jd_text or not raw_jd_text.strip():
+        return ExtractedJD()
+
+    prompt = f"""You are extracting structured data from a job description.
+Ignore site boilerplate: cookie notices, navigation menus, login/signup prompts.
+
+Job description:
+{raw_jd_text[:6000]}
+
+Respond in valid JSON only, no markdown fences:
+{{
+  "company": "company name",
+  "role_title": "exact job title",
+  "seniority": "junior|mid|senior|staff|lead|principal|manager|director|executive|unknown",
+  "responsibilities": ["responsibility 1", "responsibility 2"],
+  "must_have_skills": ["required skill 1", "required skill 2"],
+  "nice_to_have_skills": ["preferred skill 1"],
+  "tech_stack": ["technology 1", "technology 2"]
+}}
+Only include skills/technologies explicitly stated in the JD. If a field is absent, use an empty string or empty list.
+"""
+    try:
+        raw = await generate(prompt, gemini_model=_MODEL, groq_model=_GROQ_MODEL)
+        text = raw.strip().strip("```json").strip("```").strip()
+        data = json.loads(text)
+        return ExtractedJD(
+            company=str(data.get("company") or ""),
+            role_title=str(data.get("role_title") or ""),
+            seniority=str(data.get("seniority") or ""),
+            responsibilities=[str(x) for x in (data.get("responsibilities") or []) if x],
+            must_have_skills=[str(x) for x in (data.get("must_have_skills") or []) if x],
+            nice_to_have_skills=[str(x) for x in (data.get("nice_to_have_skills") or []) if x],
+            tech_stack=[str(x) for x in (data.get("tech_stack") or []) if x],
+            raw_jd_text=raw_jd_text,
+        )
+    except Exception as e:
+        print(f"[jd_fetch] structured extraction error: {e}")
+        return ExtractedJD(raw_jd_text=raw_jd_text)

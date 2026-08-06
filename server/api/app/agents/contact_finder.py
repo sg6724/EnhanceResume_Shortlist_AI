@@ -24,6 +24,22 @@ _MODEL = "gemini-2.5-flash"
 _GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
+def _normalize_domain(domain: str | None) -> str | None:
+    """Strip scheme/path/query from a user-supplied domain so callers always
+    get a bare host (e.g. "https://www.redhat.com/en" -> "www.redhat.com").
+    Without this, both the Hunter API param and the "https://{domain}{path}"
+    scrape URL break silently on anything but a bare host."""
+    if not domain:
+        return domain
+    stripped = domain.strip()
+    if "//" in stripped:
+        stripped = stripped.split("//", 1)[1]
+    else:
+        stripped = re.sub(r"^[a-z][a-z0-9+.\-]*:", "", stripped, flags=re.IGNORECASE)
+    stripped = stripped.split("/", 1)[0]
+    return stripped or None
+
+
 def candidate_domains(company_name: str) -> list[str]:
     """Guess likely domains from a company name: acmelabs.com/.io/.ai."""
     base = _COMPANY_SUFFIX_RE.sub("", company_name.lower())
@@ -127,7 +143,7 @@ async def find_contact(
     http: httpx.AsyncClient, sb, company_name: str, company_domain: str | None
 ) -> dict:
     """Hunter first (quota permitting), then scrape + pattern-guess fallback."""
-    domain = company_domain or await _resolve_domain(http, company_name)
+    domain = _normalize_domain(company_domain) or await _resolve_domain(http, company_name)
     if not domain:
         return {"found": False, "company_domain": None,
                 "failure_reason": "could not resolve company domain"}

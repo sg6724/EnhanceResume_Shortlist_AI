@@ -36,7 +36,12 @@ proc_app = App(
 
 
 @proc_app.task(name="scrape_and_process", queue="default", retry=3)
-async def scrape_and_process_task(user_id: str) -> None:
+async def scrape_and_process_task(
+    user_id: str,
+    career_urls: list[str] | None = None,
+    linkedin_urls: list[str] | None = None,
+    x_urls: list[str] | None = None,
+) -> None:
     import httpx
     from supabase import acreate_client
     from .agents.orchestrator import run_pipeline
@@ -44,7 +49,14 @@ async def scrape_and_process_task(user_id: str) -> None:
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
     http = httpx.AsyncClient(timeout=130.0)
     try:
-        result = await run_pipeline(user_id, sb, http)
+        result = await run_pipeline(
+            user_id,
+            sb,
+            http,
+            career_urls=career_urls,
+            linkedin_urls=linkedin_urls,
+            x_urls=x_urls,
+        )
         print(f"[task:scrape] {result}")
     finally:
         await http.aclose()
@@ -119,9 +131,8 @@ async def outreach_tick(timestamp: int) -> None:
 
     sb = await acreate_client(settings.supabase_url, settings.supabase_service_key)
     # Single-user app: settings.user_email identifies the one active account.
-    # Older/stale rows can linger in `users` (e.g. after the configured email
-    # changed) — without this filter, every row got an hourly outreach cycle
-    # queued against it forever, burning Hunter quota on dead accounts.
+    # Older/stale rows can linger in `users` after the configured email changes.
+    # Without this filter, every row gets an hourly application-prep cycle.
     users = await sb.table("users").select(
         "id, outreach_enabled, outreach_interval_hours, outreach_last_run_at"
     ).eq("email", settings.user_email).execute()
@@ -136,3 +147,4 @@ async def outreach_tick(timestamp: int) -> None:
                 continue
         await run_outreach_task.defer_async(user_id=u["id"])
         print(f"[tick:outreach] queued cycle for {u['id']}")
+

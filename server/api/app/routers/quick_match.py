@@ -18,6 +18,7 @@ class SubmitIn(BaseModel):
     jd_text: str
     company: str
     title: str
+    source_url: str = ""
 
 
 async def _get_user_id(sb, email: str) -> str:
@@ -64,12 +65,25 @@ async def submit(body: SubmitIn, request: Request):
         "company": company,
         "title": title,
         "location": "",
-        "url": "",
+        "url": body.source_url.strip(),
         "raw_text": body.jd_text.strip(),
         "relevance_confirmed": True,
-        "dedup_hash": dedup_hash(company, title, ""),
+        "dedup_hash": dedup_hash(company, title, "", body.source_url.strip(), body.jd_text.strip()),
     }, on_conflict="dedup_hash").execute()
     jd_id = jd_ins.data[0]["id"]
+
+    # Structured extraction -> persist decomposed JD fields (covers both
+    # pasted-text and fetched-URL submissions, since both flow through here).
+    from ..agents.jd_fetch import extract_jd_structured
+    extracted = await extract_jd_structured(body.jd_text.strip())
+    await sb.table("scraped_jds").update({
+        "role_title": extracted.role_title or title,
+        "seniority": extracted.seniority,
+        "responsibilities": extracted.responsibilities,
+        "must_have_skills": extracted.must_have_skills,
+        "nice_to_have_skills": extracted.nice_to_have_skills,
+        "tech_stack": extracted.tech_stack,
+    }).eq("id", jd_id).execute()
 
     from ..queue import run_manual_match_task
     await run_manual_match_task.defer_async(jd_id=jd_id)

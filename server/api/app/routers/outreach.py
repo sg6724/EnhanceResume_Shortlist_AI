@@ -4,9 +4,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..config import settings
-from ..services.hunter import hunter_quota_remaining, HUNTER_MONTHLY_LIMIT
 
-router = APIRouter(prefix="/outreach", tags=["outreach"])
+router = APIRouter(prefix="/outreach", tags=["application-prep"])
 
 
 class WatchlistIn(BaseModel):
@@ -38,8 +37,11 @@ async def list_targets(request: Request):
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
     res = await (
-        sb.table("outreach_targets").select("*").eq("user_id", uid)
-        .order("created_at", desc=True).execute()
+        sb.table("outreach_targets")
+        .select("*")
+        .eq("user_id", uid)
+        .order("created_at", desc=True)
+        .execute()
     )
     return res.data
 
@@ -48,15 +50,23 @@ async def list_targets(request: Request):
 async def add_watchlist(body: WatchlistIn, request: Request):
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
+    company = body.company_name.strip()
+    if not company:
+        raise HTTPException(422, "company_name is required")
     dup = await (
-        sb.table("outreach_targets").select("id").eq("user_id", uid)
-        .eq("company_name", body.company_name.strip()).maybe_single().execute()
+        sb.table("outreach_targets")
+        .select("id")
+        .eq("user_id", uid)
+        .eq("company_name", company)
+        .is_("jd_id", "null")
+        .maybe_single()
+        .execute()
     )
     if dup and dup.data:
         raise HTTPException(409, "company already tracked")
     res = await sb.table("outreach_targets").insert({
         "user_id": uid,
-        "company_name": body.company_name.strip(),
+        "company_name": company,
         "company_domain": body.company_domain,
         "source": "watchlist",
         "status": "pending",
@@ -67,23 +77,26 @@ async def add_watchlist(body: WatchlistIn, request: Request):
 @router.patch("/targets/{target_id}")
 async def patch_target(target_id: str, body: TargetPatch, request: Request):
     sb = request.app.state.supabase
-    cur = await sb.table("outreach_targets").select("*").eq("id", target_id).maybe_single().execute()
+    uid = await _get_user_id(sb, settings.user_email)
+    cur = await (
+        sb.table("outreach_targets")
+        .select("*")
+        .eq("id", target_id)
+        .eq("user_id", uid)
+        .maybe_single()
+        .execute()
+    )
     if not cur or not cur.data:
         raise HTTPException(404, "target not found")
     updates: dict = {}
     if body.retry:
         updates = {"status": "pending", "failure_reason": None, "attempts": 0}
-    manual = {k: v for k, v in {
-        "founder_name": body.founder_name,
-        "founder_title": body.founder_title,
-        "founder_email": body.founder_email,
-    }.items() if v is not None}
-    if manual:
-        updates.update(manual)
-        updates["contact_method"] = "manual"
-        updates["email_confidence"] = "guessed"
-        if body.founder_email:
-            updates["status"] = "contact_found"
+    if body.founder_name is not None:
+        updates["founder_name"] = body.founder_name
+    if body.founder_title is not None:
+        updates["founder_title"] = body.founder_title
+    if body.founder_email is not None:
+        updates["founder_email"] = body.founder_email
     if not updates:
         raise HTTPException(400, "nothing to update")
     res = await sb.table("outreach_targets").update(updates).eq("id", target_id).execute()
@@ -93,7 +106,8 @@ async def patch_target(target_id: str, body: TargetPatch, request: Request):
 @router.delete("/targets/{target_id}")
 async def delete_target(target_id: str, request: Request):
     sb = request.app.state.supabase
-    await sb.table("outreach_targets").delete().eq("id", target_id).execute()
+    uid = await _get_user_id(sb, settings.user_email)
+    await sb.table("outreach_targets").delete().eq("id", target_id).eq("user_id", uid).execute()
     return {"deleted": target_id}
 
 
@@ -105,9 +119,10 @@ async def list_drafts(request: Request):
         sb.table("outreach_drafts")
         .select("*, outreach_targets!inner(*)")
         .eq("outreach_targets.user_id", uid)
-        .eq("outreach_targets.status", "drafted")
+        .in_("outreach_targets.status", ["drafted", "approved"])
         .is_("sent_at", "null")
-        .order("created_at", desc=True).execute()
+        .order("created_at", desc=True)
+        .execute()
     )
     return res.data
 
@@ -130,24 +145,21 @@ async def patch_draft(draft_id: str, body: DraftPatch, request: Request):
 
 @router.post("/drafts/{draft_id}/approve")
 async def approve_draft(draft_id: str, request: Request):
-    if not settings.database_url:
-        raise HTTPException(503, "DATABASE_URL not set — queue unavailable")
     sb = request.app.state.supabase
     draft = await (
-        sb.table("outreach_drafts").select("id, target_id, outreach_targets(status, founder_email)")
-        .eq("id", draft_id).maybe_single().execute()
+        sb.table("outreach_drafts")
+        .select("id, target_id, outreach_targets(status)")
+        .eq("id", draft_id)
+        .maybe_single()
+        .execute()
     )
     if not draft or not draft.data:
         raise HTTPException(404, "draft not found")
     target = draft.data["outreach_targets"]
-    if not target.get("founder_email"):
-        raise HTTPException(400, "target has no contact email")
     if target["status"] not in ("drafted", "approved"):
         raise HTTPException(400, f"target status is '{target['status']}'")
     await sb.table("outreach_targets").update({"status": "approved"}).eq("id", draft.data["target_id"]).execute()
-    from ..queue import send_outreach_email_task
-    await send_outreach_email_task.defer_async(draft_id=draft_id)
-    return {"queued": True}
+    return {"status": "approved"}
 
 
 @router.post("/drafts/{draft_id}/reject")
@@ -163,7 +175,7 @@ async def reject_draft(draft_id: str, request: Request):
 @router.post("/run")
 async def run_now(request: Request):
     if not settings.database_url:
-        raise HTTPException(503, "DATABASE_URL not set — Procrastinate queue unavailable")
+        raise HTTPException(503, "DATABASE_URL not set; Procrastinate queue unavailable")
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
     from ..queue import run_outreach_task
@@ -173,6 +185,9 @@ async def run_now(request: Request):
 
 @router.get("/quota")
 async def quota(request: Request):
-    sb = request.app.state.supabase
-    remaining = await hunter_quota_remaining(sb)
-    return {"hunter_remaining": remaining, "hunter_limit": HUNTER_MONTHLY_LIMIT}
+    return {
+        "apify_configured": bool(settings.apify.api_token),
+        "career_actor_configured": bool(settings.apify.career_actor_id),
+        "linkedin_actor_configured": bool(settings.apify.linkedin_actor_id),
+        "x_actor_configured": bool(settings.apify.x_actor_id),
+    }

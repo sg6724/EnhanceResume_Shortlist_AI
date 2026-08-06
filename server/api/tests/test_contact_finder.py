@@ -1,5 +1,26 @@
 from app.agents import contact_finder
-from app.agents.contact_finder import guess_emails, candidate_domains, _domain_page_matches
+from app.agents.contact_finder import (
+    guess_emails,
+    candidate_domains,
+    _domain_page_matches,
+    _normalize_domain,
+)
+
+
+def test_normalize_domain_strips_scheme_and_path():
+    assert _normalize_domain("https://www.redhat.com/en") == "www.redhat.com"
+
+
+def test_normalize_domain_strips_trailing_slash():
+    assert _normalize_domain("http://acme.io/") == "acme.io"
+
+
+def test_normalize_domain_passes_through_bare_domain():
+    assert _normalize_domain("acme.io") == "acme.io"
+
+
+def test_normalize_domain_handles_none():
+    assert _normalize_domain(None) is None
 
 
 def test_guess_emails_patterns():
@@ -71,3 +92,25 @@ async def test_extract_leaders_short_circuits_with_no_keys(monkeypatch):
 
     leaders = await contact_finder._extract_leaders("some team page text", "Acme")
     assert leaders == []
+
+
+async def test_find_contact_normalizes_full_url_domain(monkeypatch):
+    """A watchlist entry saved with a full URL (e.g. https://www.redhat.com/en)
+    must not break Hunter lookup or the scrape fallback with a malformed
+    'https://https://...' request."""
+    monkeypatch.setattr(contact_finder.settings, "hunter_api_key", "")
+
+    seen_domains = []
+
+    async def fake_scrape_team_pages(http, domain):
+        seen_domains.append(domain)
+        return ""
+
+    monkeypatch.setattr(contact_finder, "_scrape_team_pages", fake_scrape_team_pages)
+
+    result = await contact_finder.find_contact(
+        http=None, sb=None, company_name="Redhat", company_domain="https://www.redhat.com/en"
+    )
+
+    assert seen_domains == ["www.redhat.com"]
+    assert result["company_domain"] == "www.redhat.com"

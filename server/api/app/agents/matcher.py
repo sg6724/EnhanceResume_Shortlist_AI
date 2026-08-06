@@ -2,36 +2,91 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 
 from ..config import settings
 from ..services.llm import generate
 from ..services.scoring import compute_bm25_score, compute_semantic_score
 
-# gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
 _MODEL = "gemini-2.5-flash"
 _GROQ_MODEL = "llama-3.3-70b-versatile"
+
+
+def _covered(term: str, resume_lower: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9+#.]+", " ", term.lower()).strip()
+    if not normalized:
+        return False
+    if normalized in resume_lower:
+        return True
+    tokens = [t for t in normalized.split() if len(t) > 2]
+    return bool(tokens) and all(t in resume_lower for t in tokens)
+
+
+def _coverage(terms: list[str], resume_lower: str) -> tuple[float, list[str], list[str]]:
+    if not terms:
+        return 0.5, [], []
+    matched = [term for term in terms if _covered(term, resume_lower)]
+    missing = [term for term in terms if term not in matched]
+    return len(matched) / len(terms), matched, missing
 
 
 async def compute_match(
     jd_text: str,
     resume_plain_text: str,
     position_context: str,
+    skill_terms: list[str] | None = None,
+    must_have_skills: list[str] | None = None,
+    nice_to_have_skills: list[str] | None = None,
+    tech_stack: list[str] | None = None,
+    seniority: str | None = None,
+    location: str | None = None,
 ) -> dict:
     """
-    Composite match score: BM25 30% + semantic embeddings 30% + LLM analysis 40%.
-    Returns {keyword_score, semantic_score, llm_score, composite_score, gap_analysis}.
+    ATS-style score with the existing DB-compatible output fields.
+    composite_score is deterministic and capped when must-have coverage is low.
     """
-    kw_score = compute_bm25_score(jd_text, resume_plain_text)
-    # compute_semantic_score makes a synchronous (blocking) network call to the
-    # Gemini embeddings API. Run it off the event loop thread so a slow/hung
-    # request stalls only this task, not every other queued job on the worker.
+    must = must_have_skills or []
+    nice = nice_to_have_skills or []
+    tech = tech_stack or []
+    structured_terms = must + nice + tech
+    keyword_query = " ".join(skill_terms or structured_terms) if (skill_terms or structured_terms) else jd_text
+
+    kw_score = compute_bm25_score(keyword_query, resume_plain_text)
     sem_score = await asyncio.to_thread(compute_semantic_score, jd_text, resume_plain_text)
 
-    llm_score = 0.5
+    resume_lower = resume_plain_text.lower()
+    must_score, matched_must, missing_must = _coverage(must, resume_lower)
+    nice_score, matched_nice, missing_nice = _coverage(nice, resume_lower)
+    tech_score, matched_tech, missing_tech = _coverage(tech, resume_lower)
+
+    seniority_score = 1.0
+    if seniority and seniority.lower() in {"senior", "staff", "principal", "lead"}:
+        seniority_score = 1.0 if seniority.lower() in resume_lower else 0.75
+
+    location_score = 1.0
+    if location and "remote" not in location.lower() and "remote" in resume_lower:
+        location_score = 0.9
+
+    deterministic_score = (
+        0.45 * (must_score if must else kw_score)
+        + 0.15 * nice_score
+        + 0.15 * tech_score
+        + 0.15 * sem_score
+        + 0.05 * seniority_score
+        + 0.05 * location_score
+    )
+    if must and must_score < 0.5:
+        deterministic_score = min(deterministic_score, 0.58)
+    elif must and must_score < 0.7:
+        deterministic_score = min(deterministic_score, 0.72)
+
+    matched_skills = matched_must + matched_nice + matched_tech
+    missing_skills = missing_must + missing_nice + missing_tech
     gap_analysis = (
-        "LLM analysis skipped — no GEMINI_API_KEY or GROQ_API_KEY"
-        if not settings.gemini_api_key and not settings.groq_api_key
-        else "LLM analysis unavailable"
+        f"Must-have coverage: {len(matched_must)}/{len(must) if must else 0}\n"
+        f"Nice-to-have coverage: {len(matched_nice)}/{len(nice) if nice else 0}\n"
+        f"Tech coverage: {len(matched_tech)}/{len(tech) if tech else 0}\n"
+        f"Missing must-haves: {', '.join(missing_must) if missing_must else 'none'}"
     )
 
     if settings.gemini_api_key or settings.groq_api_key:
@@ -44,30 +99,32 @@ JD (truncated to 2000 chars):
 Resume plain text (truncated to 2000 chars):
 {resume_plain_text[:2000]}
 
+Deterministic ATS findings:
+{gap_analysis}
+
 Respond in valid JSON only, no markdown fences:
 {{
-  "score": 0.0_to_1.0,
-  "gap_analysis": "• Missing skill 1\\n• Missing skill 2\\n• Missing skill 3",
-  "reasoning": "one sentence summary"
-}}
-
-Score 1.0 = perfect match, 0.0 = completely wrong role.
-"""
+  "gap_analysis": "short, specific gap analysis",
+  "matched_skills": ["skill present in resume that satisfies the JD"],
+  "missing_skills": ["JD requirement absent or weak in resume"]
+}}"""
         try:
             raw = await generate(prompt, gemini_model=_MODEL, groq_model=_GROQ_MODEL)
-            text = raw.strip().strip("```json").strip("```").strip()
-            data = json.loads(text)
-            llm_score = float(max(0.0, min(1.0, data.get("score", 0.5))))
-            gap_analysis = data.get("gap_analysis", "")
+            data = json.loads(raw.strip().strip("```json").strip("```").strip())
+            gap_analysis = data.get("gap_analysis") or gap_analysis
+            matched_skills = matched_skills or [str(x) for x in (data.get("matched_skills") or []) if x]
+            missing_skills = missing_skills or [str(x) for x in (data.get("missing_skills") or []) if x]
         except Exception as e:
             print(f"[matcher] LLM error: {e}")
-            gap_analysis = f"LLM analysis failed: {e}"
+            gap_analysis = f"{gap_analysis}\nLLM explanation failed: {e}"
 
-    composite = round(0.3 * kw_score + 0.3 * sem_score + 0.4 * llm_score, 4)
+    composite = round(max(0.0, min(1.0, deterministic_score)), 4)
     return {
         "keyword_score": round(kw_score, 4),
         "semantic_score": round(sem_score, 4),
-        "llm_score": round(llm_score, 4),
+        "llm_score": composite,
         "composite_score": composite,
         "gap_analysis": gap_analysis,
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills,
     }
