@@ -7,7 +7,7 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        "relative bg-panel border border-border rounded-2xl overflow-hidden",
+        "relative w-full max-w-full bg-panel border border-border rounded-2xl overflow-hidden",
         "shadow-[0_8px_30px_rgba(20,20,20,0.06)]"
       )}
     >
@@ -19,12 +19,12 @@ export function GlassCard({
             <span className="w-3 h-3 rounded-full bg-[#28C840]" />
           </div>
           {chromeLabel && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-panel border border-border text-[11px] text-muted">
+            <div className="absolute left-1/2 -translate-x-1/2 flex max-w-[56%] items-center gap-1.5 truncate px-3 py-1 rounded-full bg-panel border border-border text-[11px] text-muted">
               <svg width="9" height="10" viewBox="0 0 9 10" fill="none" className="text-muted/70">
                 <rect x="1" y="4" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1" />
                 <path d="M2.5 4V2.5a2 2 0 0 1 4 0V4" stroke="currentColor" strokeWidth="1" />
               </svg>
-              {chromeLabel}
+              <span className="truncate">{chromeLabel}</span>
             </div>
           )}
         </div>

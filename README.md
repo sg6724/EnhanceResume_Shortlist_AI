@@ -52,3 +52,15 @@ docker compose up --build
 - Web: http://localhost:3000
 
 See per-package READMEs under `apps/` and `services/` for details.
+
+## CI/CD
+
+GitHub Actions runs on pull requests and pushes to `main`:
+
+- `CI`: builds the Next.js client and runs the FastAPI test suite.
+- `Deploy`: runs after `CI` succeeds on `main`, or manually from the Actions tab.
+
+Set these repository secrets to enable production deploys:
+
+- Vercel client: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `NEXT_PUBLIC_API_URL`
+- Render services: `RENDER_API_DEPLOY_HOOK`, `RENDER_COMPILE_DEPLOY_HOOK`

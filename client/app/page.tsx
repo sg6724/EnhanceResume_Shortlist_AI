@@ -42,7 +42,7 @@ function StatTile({
   chipClass: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-bg/50 p-5">
+    <div className="rounded-2xl border border-border bg-bg/50 p-4 sm:p-5">
       <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center mb-4", chipClass)}>
         <Icon className="w-4 h-4" />
       </div>
@@ -60,13 +60,13 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="space-y-24 pb-16">
+    <div className="space-y-16 md:space-y-24 pb-16">
       {/* Hero */}
-      <section className="relative pt-8">
+      <section className="relative pt-4 md:pt-8">
         <GlowBackground />
         <div className="relative grid md:grid-cols-[1fr_auto] gap-10 items-start">
           <div className="max-w-2xl">
-            <h1 className="font-display text-5xl md:text-6xl leading-[1.05] tracking-tight text-text">
+            <h1 className="font-display text-[clamp(3.25rem,15vw,4.5rem)] md:text-6xl leading-[1.05] tracking-tight text-text">
               One resume.
               <br />
               Endless{" "}
@@ -76,7 +76,7 @@ export default function LandingPage() {
               </span>{" "}
               copies.
             </h1>
-            <p className="text-muted text-lg mt-6 max-w-lg">
+            <p className="text-muted text-base sm:text-lg mt-6 max-w-lg leading-8">
               Paste a job posting or a company&apos;s career page and get back a resume tailored
               to that role, scored against it, and a cover letter ready to review — no manual
               reformatting, no generic templates.
@@ -86,9 +86,9 @@ export default function LandingPage() {
         </div>
 
         {/* Mockup panel */}
-        <div className="mt-16">
-          <GlassCard className="p-8 md:p-10" chromeLabel="dashboard.gethired.ai">
-            <div className="flex items-center justify-between mb-8">
+        <div className="mt-12 md:mt-16">
+          <GlassCard className="p-5 sm:p-8 md:p-10" chromeLabel="dashboard.gethired.ai">
+            <div className="flex items-start justify-between gap-4 mb-8">
               <div>
                 <div className="text-[11px] uppercase tracking-widest text-muted font-medium">Pipeline overview</div>
                 <div className="text-xl font-display text-text mt-0.5">Your dashboard</div>
@@ -101,7 +101,7 @@ export default function LandingPage() {
                 Live
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <StatTile icon={DocumentStackIcon} label="JDs Scraped" value={stats?.total_jds ?? "—"}
                 color="text-text" chipClass="bg-text/5 text-text" />
               <StatTile icon={TargetIcon} label="Matches" value={stats?.total_matches ?? "—"}

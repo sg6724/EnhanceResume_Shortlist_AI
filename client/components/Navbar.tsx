@@ -88,7 +88,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-md border-b border-border">
-      <div className="max-w-7xl mx-auto px-6 md:px-10 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 min-h-16 py-3 md:py-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 md:gap-4">
         <Link href="/" className="font-display text-lg font-semibold text-text flex-shrink-0">
           GetHired AI
         </Link>
@@ -100,11 +100,11 @@ export function Navbar() {
         </nav>
 
         {isLanding ? (
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <Button variant="secondary" pill asChild>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 w-full sm:w-auto flex-shrink-0">
+            <Button variant="secondary" pill asChild className="px-4 sm:px-6">
               <Link href="/quick-match">Quick Match</Link>
             </Button>
-            <Button variant="primary" pill asChild>
+            <Button variant="primary" pill asChild className="px-4 sm:px-6">
               <Link href="/outreach">Application Prep</Link>
             </Button>
           </div>

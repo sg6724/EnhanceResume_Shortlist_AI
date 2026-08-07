@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-client:
+    name: Deploy client to Vercel
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+    steps:
+      - name: Checkout
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: npm ci
+        working-directory: client
+
+      - name: Pull Vercel project settings
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: npx vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+        working-directory: client
+
+      - name: Build
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: npx vercel build --prod --token "$VERCEL_TOKEN"
+        working-directory: client
+
+      - name: Deploy
+        if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
+        run: npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+        working-directory: client
+
+      - name: Skip Vercel deploy
+        if: env.VERCEL_TOKEN == '' || env.VERCEL_ORG_ID == '' || env.VERCEL_PROJECT_ID == ''
+        run: echo "Set VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID repository secrets to enable client deploys."
+
+  deploy-api:
+    name: Deploy Render services
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+      RENDER_COMPILE_DEPLOY_HOOK: ${{ secrets.RENDER_COMPILE_DEPLOY_HOOK }}
+    steps:
+      - name: Deploy API
+        if: env.RENDER_API_DEPLOY_HOOK != ''
+        run: curl -fsS -X POST "$RENDER_API_DEPLOY_HOOK"
+
+      - name: Deploy compile service
+        if: env.RENDER_COMPILE_DEPLOY_HOOK != ''
+        run: curl -fsS -X POST "$RENDER_COMPILE_DEPLOY_HOOK"
+
+      - name: Skip Render deploy
+        if: env.RENDER_API_DEPLOY_HOOK == '' && env.RENDER_COMPILE_DEPLOY_HOOK == ''
+        run: echo "Set RENDER_API_DEPLOY_HOOK and/or RENDER_COMPILE_DEPLOY_HOOK repository secrets to enable Render deploys."
