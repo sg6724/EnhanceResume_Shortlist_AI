@@ -1,0 +1,33 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    # Render free web services sleep after inactivity. Ping health endpoints often
+    # enough to keep them warm while leaving some room for GitHub schedule drift.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Render health endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping configured URLs
+        env:
+          KEEP_AWAKE_URLS: |
+            https://gethired-api-c7et.onrender.com/health
+            https://gethired-compile.onrender.com/health
+        run: |
+          set -euo pipefail
+
+          if [ -z "${KEEP_AWAKE_URLS}" ]; then
+            echo "RENDER_KEEP_AWAKE_URLS is not configured; skipping."
+            exit 0
+          fi
+
+          while IFS= read -r url; do
+            [ -z "${url}" ] && continue
+            echo "Pinging ${url}"
+            curl --fail --silent --show-error --max-time 30 --retry 2 --retry-delay 5 "${url}" > /dev/null
+          done <<< "${KEEP_AWAKE_URLS}"

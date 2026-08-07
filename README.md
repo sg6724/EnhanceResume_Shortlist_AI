@@ -64,3 +64,15 @@ Set these repository secrets to enable production deploys:
 
 - Vercel client: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `NEXT_PUBLIC_API_URL`
 - Render services: `RENDER_API_DEPLOY_HOOK`, `RENDER_COMPILE_DEPLOY_HOOK`
+
+## Keeping Render services awake
+
+Render free web services can sleep after inactivity. The `Keep Render Awake` GitHub Actions workflow
+pings configured health endpoints every 10 minutes.
+
+The workflow currently pings:
+
+```text
+https://gethired-api-c7et.onrender.com/health
+https://gethired-compile.onrender.com/health
+```
