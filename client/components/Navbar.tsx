@@ -82,57 +82,56 @@ function NavDropdown({ label, items, active }: { label: string; items: NavItem[]
   );
 }
 
-function MobileNavGroups({ active }: { active: string }) {
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
-  const activeDropdown = DROPDOWNS.find((dropdown) => dropdown.label === openGroup) ?? null;
+function MobileMenu({ active }: { active: string }) {
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setOpenGroup(null);
+    setOpen(false);
   }, [active]);
 
   return (
-    <nav className="md:hidden w-full">
-      <div className="grid grid-cols-3 gap-2">
-        {DROPDOWNS.map((dropdown) => {
-          const isActiveGroup = dropdown.items.some((item) => active === item.href);
-          const isOpen = openGroup === dropdown.label;
+    <div className="md:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-secondary text-text transition-colors hover:bg-bg"
+        aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={open}
+      >
+        <span className="sr-only">{open ? "Close navigation menu" : "Open navigation menu"}</span>
+        <span className="flex w-5 flex-col gap-1.5">
+          <span className={clsx("h-0.5 rounded-full bg-current transition-transform", open && "translate-y-2 rotate-45")} />
+          <span className={clsx("h-0.5 rounded-full bg-current transition-opacity", open && "opacity-0")} />
+          <span className={clsx("h-0.5 rounded-full bg-current transition-transform", open && "-translate-y-2 -rotate-45")} />
+        </span>
+      </button>
 
-          return (
-            <button
-              key={dropdown.label}
-              type="button"
-              onClick={() => setOpenGroup((current) => (current === dropdown.label ? null : dropdown.label))}
-              className={clsx(
-                "min-h-10 rounded-full border px-2 text-xs font-semibold transition-colors",
-                isOpen || isActiveGroup
-                  ? "border-text bg-text text-white"
-                  : "border-border bg-secondary text-muted",
-              )}
-              aria-expanded={isOpen}
-            >
-              {dropdown.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeDropdown && (
-        <div className="mt-2 grid gap-2 rounded-lg border border-border bg-panel p-2 shadow-[0_8px_24px_rgba(20,20,20,0.08)]">
-          {activeDropdown.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx(
-                "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                active === item.href ? "bg-bg text-text" : "text-muted hover:bg-bg hover:text-text",
-              )}
-            >
-              {item.label}
-            </Link>
+      {open && (
+        <nav className="absolute left-4 right-4 top-full mt-2 rounded-lg border border-border bg-panel p-3 shadow-[0_12px_32px_rgba(20,20,20,0.12)]">
+          {DROPDOWNS.map((dropdown) => (
+            <div key={dropdown.label} className="py-2 first:pt-0 last:pb-0">
+              <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                {dropdown.label}
+              </div>
+              <div className="grid gap-1">
+                {dropdown.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={clsx(
+                      "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                      active === item.href ? "bg-bg text-text" : "text-muted hover:bg-bg hover:text-text",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
-        </div>
+        </nav>
       )}
-    </nav>
+    </div>
   );
 }
 
@@ -146,6 +145,8 @@ export function Navbar() {
         <Link href="/" className="font-display text-lg font-semibold text-text flex-shrink-0">
           GetHired AI
         </Link>
+
+        <MobileMenu active={path} />
 
         <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
           {DROPDOWNS.map((dropdown) => (
@@ -165,8 +166,6 @@ export function Navbar() {
         ) : (
           <div className="w-32 flex-shrink-0" />
         )}
-
-        <MobileNavGroups active={path} />
       </div>
     </header>
   );
