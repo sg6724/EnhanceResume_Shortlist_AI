@@ -82,6 +82,60 @@ function NavDropdown({ label, items, active }: { label: string; items: NavItem[]
   );
 }
 
+function MobileNavGroups({ active }: { active: string }) {
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const activeDropdown = DROPDOWNS.find((dropdown) => dropdown.label === openGroup) ?? null;
+
+  useEffect(() => {
+    setOpenGroup(null);
+  }, [active]);
+
+  return (
+    <nav className="md:hidden w-full">
+      <div className="grid grid-cols-3 gap-2">
+        {DROPDOWNS.map((dropdown) => {
+          const isActiveGroup = dropdown.items.some((item) => active === item.href);
+          const isOpen = openGroup === dropdown.label;
+
+          return (
+            <button
+              key={dropdown.label}
+              type="button"
+              onClick={() => setOpenGroup((current) => (current === dropdown.label ? null : dropdown.label))}
+              className={clsx(
+                "min-h-10 rounded-full border px-2 text-xs font-semibold transition-colors",
+                isOpen || isActiveGroup
+                  ? "border-text bg-text text-white"
+                  : "border-border bg-secondary text-muted",
+              )}
+              aria-expanded={isOpen}
+            >
+              {dropdown.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeDropdown && (
+        <div className="mt-2 grid gap-2 rounded-lg border border-border bg-panel p-2 shadow-[0_8px_24px_rgba(20,20,20,0.08)]">
+          {activeDropdown.items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={clsx(
+                "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                active === item.href ? "bg-bg text-text" : "text-muted hover:bg-bg hover:text-text",
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </nav>
+  );
+}
+
 export function Navbar() {
   const path = usePathname();
   const isLanding = path === "/";
@@ -111,6 +165,8 @@ export function Navbar() {
         ) : (
           <div className="w-32 flex-shrink-0" />
         )}
+
+        <MobileNavGroups active={path} />
       </div>
     </header>
   );
