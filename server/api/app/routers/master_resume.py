@@ -13,6 +13,39 @@ class MasterResumeIn(BaseModel):
     tex_content: str
 
 
+async def _get_user_id(sb) -> str:
+    user_res = await sb.table("users").select("id").eq("email", settings.user_email).maybe_single().execute()
+    if user_res.data is None:
+        raise HTTPException(status_code=404, detail="user not found; run the seed migration")
+    return user_res.data["id"]
+
+
+@router.get("")
+async def latest_master(request: Request):
+    sb = request.app.state.supabase
+    user_id = await _get_user_id(sb)
+
+    res = await (
+        sb.table("master_resume")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("version", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not res.data:
+        return None
+
+    latest = res.data[0]
+    return {
+        "id": latest["id"],
+        "version": latest["version"],
+        "created_at": latest["created_at"],
+        "tex_content": latest["tex_content"],
+        "plain_text_chars": len(latest.get("plain_text_cache") or ""),
+    }
+
+
 @router.post("")
 async def upload_master(body: MasterResumeIn, request: Request):
     if not body.tex_content.strip():
@@ -20,11 +53,7 @@ async def upload_master(body: MasterResumeIn, request: Request):
 
     plain_text = tex_to_plaintext(body.tex_content)
     sb = request.app.state.supabase
-
-    user_res = await sb.table("users").select("id").eq("email", settings.user_email).maybe_single().execute()
-    if user_res.data is None:
-        raise HTTPException(status_code=404, detail="user not found; run the seed migration")
-    user_id = user_res.data["id"]
+    user_id = await _get_user_id(sb)
 
     ver_res = await sb.table("master_resume").select("version").eq("user_id", user_id).order("version", desc=True).limit(1).execute()
     next_version = (ver_res.data[0]["version"] + 1) if ver_res.data else 1

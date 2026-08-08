@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type MasterResumeUploadResult } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -33,11 +33,35 @@ Python, PyTorch, FastAPI, LangChain, RAG, LLM fine-tuning, Docker, PostgreSQL
 
 \\end{document}`;
 
+const RESUME_DRAFT_KEY = "gethired.masterResumeDraft";
+
 export default function ResumePage() {
   const [tex, setTex] = useState("");
+  const [loadingResume, setLoadingResume] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<MasterResumeUploadResult | null>(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const draft = window.localStorage.getItem(RESUME_DRAFT_KEY);
+    if (draft) {
+      setTex(draft);
+      setLoadingResume(false);
+      return;
+    }
+
+    api.latestResume()
+      .then((latest) => {
+        if (latest?.tex_content) setTex(latest.tex_content);
+      })
+      .catch((e: any) => setError(e.message))
+      .finally(() => setLoadingResume(false));
+  }, []);
+
+  const updateTex = (nextTex: string) => {
+    setTex(nextTex);
+    window.localStorage.setItem(RESUME_DRAFT_KEY, nextTex);
+  };
 
   const upload = async () => {
     if (!tex.trim()) return;
@@ -47,6 +71,7 @@ export default function ResumePage() {
     try {
       const r = await api.uploadResume(tex);
       setResult(r);
+      window.localStorage.setItem(RESUME_DRAFT_KEY, tex);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -65,9 +90,9 @@ export default function ResumePage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <Label htmlFor="tex-source">LaTeX Source (.tex)</Label>
-          {!tex && (
+          {!tex && !loadingResume && (
             <button
-              onClick={() => setTex(EXAMPLE_TEX)}
+              onClick={() => updateTex(EXAMPLE_TEX)}
               className="text-xs text-accent hover:underline"
             >
               Load example
@@ -78,8 +103,8 @@ export default function ResumePage() {
           <Textarea
             id="tex-source"
             value={tex}
-            onChange={(e) => setTex(e.target.value)}
-            placeholder={EXAMPLE_TEX}
+            onChange={(e) => updateTex(e.target.value)}
+            placeholder={loadingResume ? "Loading saved resume..." : EXAMPLE_TEX}
             rows={22}
             spellCheck={false}
             className="font-mono"

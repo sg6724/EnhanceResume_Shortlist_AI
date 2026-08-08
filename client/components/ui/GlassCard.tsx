@@ -2,13 +2,14 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 export function GlassCard({
-  className, chrome = true, chromeLabel, children,
-}: { className?: string; chrome?: boolean; chromeLabel?: string; children: ReactNode }) {
+  className, containerClassName, chrome = true, chromeLabel, children,
+}: { className?: string; containerClassName?: string; chrome?: boolean; chromeLabel?: string; children: ReactNode }) {
   return (
     <div
       className={cn(
         "relative w-full max-w-full bg-panel border border-border rounded-2xl overflow-hidden",
-        "shadow-[0_8px_30px_rgba(20,20,20,0.06)]"
+        "shadow-[0_8px_30px_rgba(20,20,20,0.06)]",
+        containerClassName
       )}
     >
       {chrome && (

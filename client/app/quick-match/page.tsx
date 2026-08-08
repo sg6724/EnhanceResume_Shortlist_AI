@@ -12,6 +12,10 @@ import { CoverLetterCard } from "@/components/CoverLetterCard";
 
 type Stage = "idle" | "fetching" | "reviewing" | "running" | "done";
 
+function uniqueList(items?: string[]) {
+  return Array.from(new Set((items ?? []).map((item) => item.trim()).filter(Boolean)));
+}
+
 export default function QuickMatchPage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [url, setUrl] = useState("");
@@ -180,7 +184,7 @@ export default function QuickMatchPage() {
                   <div>
                     <div className="text-xs text-muted">Must-have skills</div>
                     <div className="flex flex-wrap gap-1.5 mt-1">
-                      {extracted.must_have_skills.map((s) => <Badge key={s} tone="accent">{s}</Badge>)}
+                      {uniqueList(extracted.must_have_skills).map((s) => <Badge key={s} tone="accent">{s}</Badge>)}
                     </div>
                   </div>
                 ) : null}
@@ -188,7 +192,7 @@ export default function QuickMatchPage() {
                   <div>
                     <div className="text-xs text-muted">Tech stack</div>
                     <div className="flex flex-wrap gap-1.5 mt-1">
-                      {extracted.tech_stack.map((s) => <Badge key={s} tone="accent">{s}</Badge>)}
+                      {uniqueList(extracted.tech_stack).map((s) => <Badge key={s} tone="accent">{s}</Badge>)}
                     </div>
                   </div>
                 ) : null}
@@ -240,7 +244,7 @@ export default function QuickMatchPage() {
                   <div>
                     <div className="text-xs text-muted">Matched skills</div>
                     <div className="flex flex-wrap gap-1.5 mt-1">
-                      {status.match.matched_skills.map((s) => <Badge key={s} tone="ok">{s}</Badge>)}
+                      {uniqueList(status.match.matched_skills).map((s) => <Badge key={s} tone="ok">{s}</Badge>)}
                     </div>
                   </div>
                 ) : null}
@@ -248,7 +252,7 @@ export default function QuickMatchPage() {
                   <div>
                     <div className="text-xs text-muted">Missing skills</div>
                     <div className="flex flex-wrap gap-1.5 mt-1">
-                      {status.match.missing_skills.map((s) => <Badge key={s} tone="bad">{s}</Badge>)}
+                      {uniqueList(status.match.missing_skills).map((s) => <Badge key={s} tone="bad">{s}</Badge>)}
                     </div>
                   </div>
                 ) : null}

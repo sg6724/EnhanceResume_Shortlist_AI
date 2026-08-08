@@ -193,6 +193,14 @@ export interface MasterResumeUploadResult {
   plain_text_chars: number;
 }
 
+export interface MasterResumeLatest {
+  id: string;
+  version: number;
+  created_at: string;
+  tex_content: string;
+  plain_text_chars: number;
+}
+
 export interface QuickMatchFetchResult {
   company: string;
   title: string;
@@ -264,6 +272,7 @@ export const api = {
     req<{ status: string }>(`/checkpoints/${id}/reject`, { method: "POST" }),
 
   // Master resume
+  latestResume: () => req<MasterResumeLatest | null>("/master-resume"),
   uploadResume: (tex: string) =>
     req<MasterResumeUploadResult>("/master-resume", {
       method: "POST",

@@ -58,7 +58,11 @@ function NavButton({ direction, onClick, disabled }: { direction: "prev" | "next
   );
 }
 
-const CARD_WIDTH_CLASS = "w-[min(90vw,480px)] snap-start flex-shrink-0";
+const CARD_WIDTH_CLASS = "w-[min(90vw,480px)] snap-start flex-none";
+
+function uniqueList(items?: string[]) {
+  return Array.from(new Set((items ?? []).map((item) => item.trim()).filter(Boolean)));
+}
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<JdMatch[]>([]);
@@ -133,7 +137,7 @@ export default function MatchesPage() {
           style={{ scrollbarWidth: "none" }}
         >
           {matches.map((m) => (
-            <GlassCard key={m.id} chrome={false} className={clsx(CARD_WIDTH_CLASS, "p-6 space-y-5")}>
+            <GlassCard key={m.id} chrome={false} containerClassName={CARD_WIDTH_CLASS} className="p-6 space-y-5">
               {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -184,19 +188,19 @@ export default function MatchesPage() {
               {/* Matched / Missing skills */}
               {Boolean(m.matched_skills?.length || m.missing_skills?.length) && (
                 <div className="space-y-3">
-                  {m.matched_skills?.length ? (
+                  {uniqueList(m.matched_skills).length ? (
                     <div>
                       <div className="text-[10px] uppercase tracking-wider text-ok mb-1.5 font-medium">Matched</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {m.matched_skills.map((s) => <Badge key={s} tone="ok">{s}</Badge>)}
+                        {uniqueList(m.matched_skills).map((s) => <Badge key={s} tone="ok">{s}</Badge>)}
                       </div>
                     </div>
                   ) : null}
-                  {m.missing_skills?.length ? (
+                  {uniqueList(m.missing_skills).length ? (
                     <div>
                       <div className="text-[10px] uppercase tracking-wider text-bad mb-1.5 font-medium">Missing</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {m.missing_skills.map((s) => <Badge key={s} tone="bad">{s}</Badge>)}
+                        {uniqueList(m.missing_skills).map((s) => <Badge key={s} tone="bad">{s}</Badge>)}
                       </div>
                     </div>
                   ) : null}
