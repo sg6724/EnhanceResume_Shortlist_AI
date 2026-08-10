@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "GetHired AI",
-  description: "Agentic job-hunting platform — tailor your resume to every JD automatically.",
+  description: "Agentic job-hunting platform - tailor your resume to every JD automatically.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -66,19 +66,19 @@ export default function LandingPage() {
         <GlowBackground />
         <div className="relative grid md:grid-cols-[1fr_auto] gap-10 items-start">
           <div className="max-w-2xl">
-            <h1 className="font-display text-[clamp(3.25rem,15vw,4.5rem)] md:text-6xl leading-[1.05] tracking-tight text-text">
+            <h1 className="font-display text-[clamp(3.25rem,15vw,4.5rem)] md:text-6xl leading-[1.12] md:leading-[1.08] tracking-tight text-text">
               One resume.
               <br />
               Endless{" "}
-              <span className="relative inline-block">
-                <em className="italic">tailored</em>
-                <SquiggleUnderline className="absolute left-0 -bottom-2 w-full h-2.5 text-coral" />
+              <span className="relative inline-block pb-4 align-baseline">
+                <em className="relative z-10 italic">tailored</em>
+                <SquiggleUnderline className="absolute left-0 bottom-0 w-full h-2.5 text-coral" />
               </span>{" "}
               copies.
             </h1>
-            <p className="text-muted text-base sm:text-lg mt-6 max-w-lg leading-8">
+            <p className="text-muted text-base sm:text-lg mt-8 max-w-lg leading-8">
               Paste a job posting or a company&apos;s career page and get back a resume tailored
-              to that role, scored against it, and a cover letter ready to review — no manual
+              to that role, scored against it, and a cover letter ready to review - no manual
               reformatting, no generic templates.
             </p>
           </div>
@@ -102,13 +102,13 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              <StatTile icon={DocumentStackIcon} label="JDs Scraped" value={stats?.total_jds ?? "—"}
+              <StatTile icon={DocumentStackIcon} label="JDs Scraped" value={stats?.total_jds ?? "-"}
                 color="text-text" chipClass="bg-text/5 text-text" />
-              <StatTile icon={TargetIcon} label="Matches" value={stats?.total_matches ?? "—"}
+              <StatTile icon={TargetIcon} label="Matches" value={stats?.total_matches ?? "-"}
                 color="text-accent" chipClass="bg-accent/10 text-accent" />
-              <StatTile icon={CopyStackIcon} label="Copies Made" value={stats?.total_copies ?? "—"}
+              <StatTile icon={CopyStackIcon} label="Copies Made" value={stats?.total_copies ?? "-"}
                 color="text-ok" chipClass="bg-ok/10 text-ok" />
-              <StatTile icon={ClockIcon} label="Pending" value={stats?.pending_checkpoints ?? "—"}
+              <StatTile icon={ClockIcon} label="Pending" value={stats?.pending_checkpoints ?? "-"}
                 color="text-warn" chipClass="bg-warn/10 text-warn" />
             </div>
           </GlassCard>
