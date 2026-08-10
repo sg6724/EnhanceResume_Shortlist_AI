@@ -7,6 +7,15 @@ import httpx
 from ..config import settings
 from ..services.email import notify_compile_failed
 
+PUBLIC_COMPILE_SERVICE_URL = "https://gethired-compile.onrender.com"
+
+
+def _compile_service_urls() -> list[str]:
+    urls = [settings.compile.compile_service_url.rstrip("/")]
+    if PUBLIC_COMPILE_SERVICE_URL not in urls:
+        urls.append(PUBLIC_COMPILE_SERVICE_URL)
+    return urls
+
 
 async def compile_with_retry(
     http: httpx.AsyncClient,
@@ -22,16 +31,23 @@ async def compile_with_retry(
     """
     current_tex = tex
     last_error = ""
+    service_urls = _compile_service_urls()
 
     for attempt in range(1, max_retries + 1):
-        try:
-            resp = await http.post(
-                f"{settings.compile.compile_service_url}/compile",
-                json={"tex": current_tex, "engine": "pdflatex", "jobname": "resume"},
-                timeout=150.0,
-            )
-        except Exception as e:
-            last_error = f"HTTP error calling compile service: {e}"
+        resp = None
+        for service_url in service_urls:
+            try:
+                resp = await http.post(
+                    f"{service_url}/compile",
+                    json={"tex": current_tex, "engine": "pdflatex", "jobname": "resume"},
+                    timeout=150.0,
+                )
+                break
+            except Exception as e:
+                last_error = f"HTTP error calling compile service at {service_url}: {e}"
+                continue
+
+        if resp is None:
             break
 
         if resp.status_code == 200:

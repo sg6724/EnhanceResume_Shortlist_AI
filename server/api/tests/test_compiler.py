@@ -29,6 +29,19 @@ def _fake_http(responses: list[_FakeResponse]) -> httpx.AsyncClient:
     return _Client()
 
 
+def _fake_http_with_error_then_success():
+    calls: list[str] = []
+
+    class _Client:
+        async def post(self, url, *args, **kwargs):
+            calls.append(url)
+            if len(calls) == 1:
+                raise httpx.ConnectError("Name or service not known")
+            return _FakeResponse(200, content=b"%PDF-fallback")
+
+    return _Client(), calls
+
+
 async def test_retry_continues_after_rewriter_raises_instead_of_aborting():
     """A rewriter failure on one attempt must not burn the remaining retry budget."""
     responses = [
@@ -77,3 +90,22 @@ async def test_all_attempts_exhausted_still_returns_last_error():
 
     assert pdf_bytes is None
     assert "compile error" in error_log
+
+
+async def test_compile_falls_back_to_public_service_when_configured_url_fails():
+    http, calls = _fake_http_with_error_then_success()
+
+    async def rewriter_fn(current_tex: str, error_log: str, attempt: int):
+        return current_tex, "fixed"
+
+    pdf_bytes, _final_tex, error_log = await compile_with_retry(
+        http=http,
+        tex="\\documentclass{article}",
+        rewriter_fn=rewriter_fn,
+        max_retries=1,
+    )
+
+    assert pdf_bytes == b"%PDF-fallback"
+    assert error_log == ""
+    assert len(calls) == 2
+    assert calls[-1] == "https://gethired-compile.onrender.com/compile"
