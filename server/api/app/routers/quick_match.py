@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
-from ..config import settings
 from ..agents.jd_fetch import fetch_jd_from_url
 from ..agents.scraper import dedup_hash
+from ..config import settings
+from ..services.in_process_jobs import is_quick_match_running, run_quick_match_in_process
 
 router = APIRouter(prefix="/quick-match", tags=["quick-match"])
 
@@ -39,13 +40,11 @@ async def fetch_url(body: FetchUrlIn, request: Request):
 
 
 @router.post("")
-async def submit(body: SubmitIn, request: Request):
+async def submit(body: SubmitIn, request: Request, background_tasks: BackgroundTasks):
     if not body.jd_text.strip():
         raise HTTPException(422, "jd_text is required")
     if not body.company.strip() or not body.title.strip():
         raise HTTPException(422, "company and title are required")
-    if not settings.database_url:
-        raise HTTPException(503, "DATABASE_URL not set — Procrastinate queue unavailable")
 
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
@@ -55,7 +54,7 @@ async def submit(body: SubmitIn, request: Request):
         .order("version", desc=True).limit(1).execute()
     )
     if not mr_res.data:
-        raise HTTPException(404, "no master resume uploaded — upload one on the Master Resume page first")
+        raise HTTPException(404, "no master resume uploaded - upload one on the Master Resume page first")
 
     company = body.company.strip()
     title = body.title.strip()
@@ -72,8 +71,6 @@ async def submit(body: SubmitIn, request: Request):
     }, on_conflict="dedup_hash").execute()
     jd_id = jd_ins.data[0]["id"]
 
-    # Structured extraction -> persist decomposed JD fields (covers both
-    # pasted-text and fetched-URL submissions, since both flow through here).
     from ..agents.jd_fetch import extract_jd_structured
     extracted = await extract_jd_structured(body.jd_text.strip())
     await sb.table("scraped_jds").update({
@@ -85,13 +82,12 @@ async def submit(body: SubmitIn, request: Request):
         "tech_stack": extracted.tech_stack,
     }).eq("id", jd_id).execute()
 
-    from ..queue import run_manual_match_task
-    await run_manual_match_task.defer_async(jd_id=jd_id)
+    background_tasks.add_task(run_quick_match_in_process, jd_id)
     return {"jd_id": jd_id, "queued": True}
 
 
 @router.get("/{jd_id}")
-async def status(jd_id: str, request: Request):
+async def status(jd_id: str, request: Request, background_tasks: BackgroundTasks):
     sb = request.app.state.supabase
     jd_res = await sb.table("scraped_jds").select("id").eq("id", jd_id).maybe_single().execute()
     if not jd_res or not jd_res.data:
@@ -118,6 +114,9 @@ async def status(jd_id: str, request: Request):
         )
         if draft_res.data:
             draft = draft_res.data[0]
+
+    if not match_res.data and not copy_res.data and not draft and not is_quick_match_running(jd_id):
+        background_tasks.add_task(run_quick_match_in_process, jd_id)
 
     return {
         "match": match_res.data[0] if match_res.data else None,

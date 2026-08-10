@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
 from ..config import settings
+from ..services.in_process_jobs import (
+    is_application_run_running,
+    retry_target_in_process,
+    run_application_prep_in_process,
+)
 
 router = APIRouter(prefix="/outreach", tags=["application-prep"])
 
@@ -49,9 +54,7 @@ async def delete_target(target_id: str, request: Request):
 
 
 @router.post("/targets/{target_id}/retry")
-async def retry_target(target_id: str, request: Request):
-    if not settings.database_url:
-        raise HTTPException(503, "DATABASE_URL not set; Procrastinate queue unavailable")
+async def retry_target(target_id: str, request: Request, background_tasks: BackgroundTasks):
     sb = request.app.state.supabase
     uid = await _get_user_id(sb, settings.user_email)
     cur = await (
@@ -59,8 +62,7 @@ async def retry_target(target_id: str, request: Request):
     )
     if not cur or not cur.data:
         raise HTTPException(404, "target not found")
-    from ..queue import retry_application_target_task
-    await retry_application_target_task.defer_async(target_id=target_id)
+    background_tasks.add_task(retry_target_in_process, target_id)
     return {"queued": True}
 
 
@@ -124,9 +126,7 @@ async def reject_draft(draft_id: str, request: Request):
 
 
 @router.post("/prepare", status_code=201)
-async def prepare_application(body: PrepareIn, request: Request):
-    if not settings.database_url:
-        raise HTTPException(503, "DATABASE_URL not set; Procrastinate queue unavailable")
+async def prepare_application(body: PrepareIn, request: Request, background_tasks: BackgroundTasks):
     if not (body.career_urls or body.linkedin_urls or body.x_urls):
         raise HTTPException(422, "at least one URL is required")
     sb = request.app.state.supabase
@@ -136,21 +136,33 @@ async def prepare_application(body: PrepareIn, request: Request):
         "career_urls": body.career_urls, "linkedin_urls": body.linkedin_urls, "x_urls": body.x_urls,
     }).execute()
     run_id = run_ins.data[0]["id"]
-    from ..queue import prepare_application_task
-    await prepare_application_task.defer_async(
-        run_id=run_id, user_id=uid,
-        career_urls=body.career_urls, linkedin_urls=body.linkedin_urls, x_urls=body.x_urls,
+    background_tasks.add_task(
+        run_application_prep_in_process,
+        run_id,
+        uid,
+        body.career_urls,
+        body.linkedin_urls,
+        body.x_urls,
     )
     return {"run_id": run_id}
 
 
 @router.get("/runs/{run_id}")
-async def get_run(run_id: str, request: Request):
+async def get_run(run_id: str, request: Request, background_tasks: BackgroundTasks):
     sb = request.app.state.supabase
     res = await sb.table("application_runs").select("*").eq("id", run_id).maybe_single().execute()
     if not res or not res.data:
         raise HTTPException(404, "run not found")
     run = res.data
+    if run["status"] == "running" and not is_application_run_running(run_id):
+        background_tasks.add_task(
+            run_application_prep_in_process,
+            run_id,
+            run["user_id"],
+            run.get("career_urls") or [],
+            run.get("linkedin_urls") or [],
+            run.get("x_urls") or [],
+        )
     if run["status"] != "running":
         percent = 100
     elif run["jds_found"] == 0:
