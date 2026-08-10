@@ -4,17 +4,9 @@ from typing import Callable, Awaitable
 
 import httpx
 
+from ..compile_client import _compile_service_urls
 from ..config import settings
 from ..services.email import notify_compile_failed
-
-PUBLIC_COMPILE_SERVICE_URL = "https://gethired-compile.onrender.com"
-
-
-def _compile_service_urls() -> list[str]:
-    urls = [settings.compile.compile_service_url.rstrip("/")]
-    if PUBLIC_COMPILE_SERVICE_URL not in urls:
-        urls.append(PUBLIC_COMPILE_SERVICE_URL)
-    return urls
 
 
 async def compile_with_retry(
