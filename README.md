@@ -8,11 +8,6 @@ of your master resume for each role, compiles it to PDF, and surfaces the result
 Core mental model: the master `.tex` is the **"real DOM"** (never mutated); each JD-specific copy is a
 **"virtual DOM"** fork — patched, rendered, diffed against the master.
 
-## Status
-
-🚧 **Phase 0 — skeleton & infra.** See the full design and phased roadmap in
-[`docs/superpowers/specs/2026-06-29-job-hunt-agent-design.md`](docs/superpowers/specs/2026-06-29-job-hunt-agent-design.md).
-
 ## Tech stack
 
 | Layer | Choice |
