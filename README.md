@@ -44,7 +44,7 @@ docker compose up --build
 
 - API: http://localhost:8000  (health: `/health`)
 - Compile service: http://localhost:8001 (health: `/health`)
-- Web: http://localhost:3000
+- Web: [https://gethired-ai-client.vercel.app/](https://gethired-ai-client.vercel.app/)
 
 See per-package READMEs under `apps/` and `services/` for details.
 
