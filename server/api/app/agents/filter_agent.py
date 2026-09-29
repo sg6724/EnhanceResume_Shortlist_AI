@@ -8,7 +8,7 @@ from ..services.llm import generate
 # gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
 # The filter is a cheap, high-volume gate, so use the lite model.
 _MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "llama-3.3-70b-versatile"
+_GROQ_MODEL = "openai/gpt-oss-120b"
 
 
 async def is_jd_relevant(jd_text: str, target_titles: list[str]) -> tuple[bool, str]:

@@ -23,9 +23,18 @@ _groq_client: AsyncGroq | None = None
 _RETRY_DELAYS = (1.0, 4.0, 12.0)
 
 
+_TRANSIENT_MARKERS = (
+    "429", "rate limit", "resource_exhausted",
+    "500", "503", "504", "unavailable", "deadline_exceeded", "overloaded", "timed out",
+)
+
+
 def _is_rate_limit(exc: Exception) -> bool:
+    """True for errors worth retrying: rate limits and transient provider/capacity
+    failures (e.g. Gemini's 503 UNAVAILABLE / 504 DEADLINE_EXCEEDED). Permanent
+    errors such as 404 model_not_found are not retried."""
     text = str(exc).lower()
-    return "429" in text or "rate limit" in text or "resource_exhausted" in text
+    return any(marker in text for marker in _TRANSIENT_MARKERS)
 
 
 def _short_error(exc: Exception) -> str:

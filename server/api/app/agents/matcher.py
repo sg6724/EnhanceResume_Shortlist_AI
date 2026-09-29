@@ -9,7 +9,7 @@ from ..services.llm import generate
 from ..services.scoring import compute_bm25_score, compute_semantic_score
 
 _MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "llama-3.3-70b-versatile"
+_GROQ_MODEL = "openai/gpt-oss-120b"
 
 
 def _covered(term: str, resume_lower: str) -> bool:

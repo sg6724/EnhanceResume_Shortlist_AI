@@ -133,3 +133,45 @@ async def test_generate_raises_immediately_when_no_keys_configured(monkeypatch):
         await llm.generate("prompt", gemini_model="gm", groq_model="qm")
     assert "no GEMINI_API_KEY" in str(exc_info.value)
     assert "no GROQ_API_KEY" in str(exc_info.value)
+
+
+async def test_generate_retries_transient_gemini_503_instead_of_falling_through(monkeypatch):
+    """503/504 from Gemini are transient capacity errors, not just 429s."""
+    monkeypatch.setattr(llm.settings, "gemini_api_key", "g-key")
+    monkeypatch.setattr(llm.settings, "groq_api_key", "")
+
+    async def _no_sleep(_s):
+        pass
+
+    monkeypatch.setattr(llm.asyncio, "sleep", _no_sleep)
+    outcomes = [
+        RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand"),
+        RuntimeError("504 DEADLINE_EXCEEDED. The request timed out"),
+        "recovered",
+    ]
+
+    class _Models:
+        async def generate_content(self, model, contents):
+            o = outcomes.pop(0)
+            if isinstance(o, Exception):
+                raise o
+            return _FakeResp(o)
+
+    class _Client:
+        aio = type("A", (), {"models": _Models()})()
+
+    monkeypatch.setattr(llm, "get_client", lambda: _Client())
+
+    out = await llm.generate("p", gemini_model="m", groq_model="g")
+
+    assert out == "recovered"
+
+
+def test_no_agent_still_uses_the_retired_groq_model():
+    """llama-3.3-70b-versatile returns 404 model_not_found on our Groq account, which
+    silently disabled the fallback provider."""
+    import pathlib
+
+    agents = pathlib.Path(llm.__file__).parent.parent / "agents"
+    offenders = [p.name for p in agents.glob("*.py") if "llama-3.3-70b-versatile" in p.read_text(encoding="utf-8")]
+    assert offenders == []

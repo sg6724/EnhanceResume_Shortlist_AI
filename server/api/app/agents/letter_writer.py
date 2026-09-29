@@ -6,7 +6,7 @@ from ..config import settings
 from ..services.llm import generate
 
 _MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "llama-3.3-70b-versatile"
+_GROQ_MODEL = "openai/gpt-oss-120b"
 
 BANNED_PHRASES = [
     "i hope this email finds you well",
