@@ -31,7 +31,9 @@ async def _log_trace(sb, jd_id: str | None, agent: str, log: str, reasoning: str
     }).execute()
 
 
-async def _mark_quick_match_failed(sb, jd_id: str, error: Exception) -> None:
+async def _mark_quick_match_failed(sb, jd_id: str) -> None:
+    # The error itself is recorded in agent_traces by the caller; diff_patch is shown in
+    # the Copies UI, so keep provider error text out of it.
     jd_res = await sb.table("scraped_jds").select("*").eq("id", jd_id).maybe_single().execute()
     if not jd_res or not jd_res.data:
         return
@@ -47,7 +49,6 @@ async def _mark_quick_match_failed(sb, jd_id: str, error: Exception) -> None:
         "user_id": user_id,
         "master_resume_id": master.get("id"),
         "tex_content": master.get("tex_content") or "",
-        "diff_patch": f"Quick Match failed before completion: {error}",
         "status": "failed",
     }).execute()
 
@@ -65,7 +66,7 @@ async def run_quick_match_in_process(jd_id: str) -> None:
         print(f"[in-process:quick_match] failed for {jd_id}: {e!r}")
         try:
             await _log_trace(sb, jd_id, "quick_match", f"Quick Match failed: {e}", repr(e))
-            await _mark_quick_match_failed(sb, jd_id, e)
+            await _mark_quick_match_failed(sb, jd_id)
         except Exception as cleanup_error:
             print(f"[in-process:quick_match] failure cleanup failed for {jd_id}: {cleanup_error!r}")
     finally:
