@@ -4,7 +4,7 @@ from typing import Callable, Awaitable
 
 import httpx
 
-from ..compile_client import _compile_service_urls
+from ..compile_client import _compile_service_urls, compile_error_log
 from ..config import settings
 from ..services.email import notify_compile_failed
 
@@ -45,7 +45,7 @@ async def compile_with_retry(
         if resp.status_code == 200:
             return resp.content, current_tex, ""
 
-        last_error = resp.json().get("log", resp.text)[:2000]
+        last_error = compile_error_log(resp)
         print(f"[compiler] Attempt {attempt}/{max_retries} failed")
 
         if attempt < max_retries:

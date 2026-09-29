@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from ..config import settings
-from ..compile_client import compile_tex
+from ..compile_client import compile_error_log, compile_tex
 from ..services.pdf_storage import fetch_pdf, store_pdf
 
 router = APIRouter(prefix="/copies", tags=["copies"])
@@ -66,18 +66,24 @@ async def update_tex(copy_id: str, body: TexUpdateIn, request: Request):
         {"tex_content": body.tex_content, "status": "compiling"}
     ).eq("id", copy_id).execute()
 
-    resp = await compile_tex(request.app.state.http, body.tex_content)
-    if resp.status_code == 200:
-        updates = {"status": "compiled"}
-        cur = await sb.table("resume_copies").select("user_id").eq("id", copy_id).maybe_single().execute()
-        try:
-            updates["pdf_storage_path"] = await store_pdf(sb, cur.data["user_id"], copy_id, resp.content)
-        except Exception:
-            pass  # compile succeeded; PDF storage is best-effort, keep previous path if any
-        await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
-        return {"status": "compiled"}
+    # Never let this handler raise: an unhandled 500 skips CORSMiddleware, so the browser
+    # shows a bare "Failed to fetch", and the row would stay "compiling" forever.
+    try:
+        resp = await compile_tex(request.app.state.http, body.tex_content)
+        if resp.status_code == 200:
+            updates = {"status": "compiled"}
+            try:
+                cur = await sb.table("resume_copies").select("user_id").eq("id", copy_id).maybe_single().execute()
+                updates["pdf_storage_path"] = await store_pdf(sb, cur.data["user_id"], copy_id, resp.content)
+            except Exception:
+                pass  # compile succeeded; PDF storage is best-effort, keep previous path if any
+            await sb.table("resume_copies").update(updates).eq("id", copy_id).execute()
+            return {"status": "compiled"}
+        log = compile_error_log(resp, 500)
+    except Exception as e:
+        log = f"compile failed: {e}"[:500]
     await sb.table("resume_copies").update({"status": "failed"}).eq("id", copy_id).execute()
-    return {"status": "failed", "log": resp.json().get("log", "")[:500]}
+    return {"status": "failed", "log": log}
 
 
 @router.patch("/{copy_id}/apply")

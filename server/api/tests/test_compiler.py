@@ -109,3 +109,24 @@ async def test_compile_falls_back_to_public_service_when_configured_url_fails():
     assert error_log == ""
     assert len(calls) == 2
     assert calls[-1] == "https://gethired-compile.onrender.com/compile"
+
+
+async def test_compile_with_retry_tolerates_non_json_error_body():
+    """An HTML 502 from the compile service must be treated as a failed attempt, not crash."""
+    class _Html:
+        status_code = 502
+        content = b""
+        text = "<html>Bad Gateway</html>"
+
+        def json(self):
+            raise ValueError("Expecting value")
+
+    pdf, _tex, err = await compile_with_retry(
+        http=_fake_http([_Html()]),
+        tex="x",
+        rewriter_fn=lambda *_a: (_ for _ in ()).throw(RuntimeError("no rewrite")),
+        max_retries=1,
+    )
+
+    assert pdf is None
+    assert "Bad Gateway" in err

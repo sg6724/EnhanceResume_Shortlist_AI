@@ -34,3 +34,15 @@ async def compile_tex(
         status_code=503,
         json={"detail": "compile service unavailable", "log": last_error},
     )
+
+
+def compile_error_log(resp: httpx.Response, limit: int = 2000) -> str:
+    """Best-effort error text from a non-200 compile response. The compile service
+    returns {"log": ...}, but a proxy in front of it (e.g. Render while the free
+    instance cold-starts) answers with HTML, so never assume the body is JSON."""
+    try:
+        body = resp.json()
+        log = body.get("log") if isinstance(body, dict) else None
+    except Exception:
+        log = None
+    return (log or f"compile service returned HTTP {resp.status_code}: {resp.text}")[:limit]
