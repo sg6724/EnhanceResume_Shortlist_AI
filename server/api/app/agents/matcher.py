@@ -8,8 +8,8 @@ from ..config import settings
 from ..services.llm import generate
 from ..services.scoring import compute_bm25_score, compute_semantic_score
 
-_MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "openai/gpt-oss-120b"
+_MODEL = "gemini-3.5-flash"
+_GROQ_MODEL = "qwen/qwen3.8-27b"
 
 
 def _covered(term: str, resume_lower: str) -> bool:

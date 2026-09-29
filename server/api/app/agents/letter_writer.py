@@ -5,8 +5,8 @@ import json
 from ..config import settings
 from ..services.llm import generate
 
-_MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "openai/gpt-oss-120b"
+_MODEL = "gemini-3.5-flash"
+_GROQ_MODEL = "qwen/qwen3.8-27b"
 
 BANNED_PHRASES = [
     "i hope this email finds you well",

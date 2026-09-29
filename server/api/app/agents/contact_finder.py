@@ -20,8 +20,8 @@ _COMPANY_SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 _TEAM_PATHS = ["/about", "/team", "/about-us", "/company"]
-_MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "openai/gpt-oss-120b"
+_MODEL = "gemini-3.5-flash"
+_GROQ_MODEL = "qwen/qwen3.8-27b"
 
 
 def _normalize_domain(domain: str | None) -> str | None:

@@ -7,8 +7,8 @@ from ..services.llm import generate
 
 # gemini-2.0-flash was removed from the Gemini free tier (429 "limit: 0").
 # Rewriting LaTeX needs capability, so use the full flash model.
-_MODEL = "gemini-2.5-flash"
-_GROQ_MODEL = "openai/gpt-oss-120b"
+_MODEL = "gemini-3.5-flash"
+_GROQ_MODEL = "qwen/qwen3.8-27b"
 
 
 def _extract_environments(tex: str) -> frozenset[str]:

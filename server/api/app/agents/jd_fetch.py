@@ -11,10 +11,10 @@ from pydantic import BaseModel, Field
 from ..config import settings
 from ..services.llm import generate, get_client
 
-_MODEL = "gemini-2.0-flash"
-_GROQ_MODEL = "openai/gpt-oss-120b"
+_MODEL = "gemini-3.5-flash"
+_GROQ_MODEL = "qwen/qwen3.8-27b"
 # url_context requires 2.5-flash — not available on 2.0-flash.
-_URL_CONTEXT_MODEL = "gemini-2.5-flash"
+_URL_CONTEXT_MODEL = "gemini-3.5-flash"
 
 _JSONLD_RE = re.compile(
     r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
