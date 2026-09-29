@@ -4,7 +4,7 @@ from typing import Callable, Awaitable
 
 import httpx
 
-from ..compile_client import _compile_service_urls, compile_error_log
+from ..compile_client import _compile_service_urls, compile_error_log, post_compile
 from ..config import settings
 from ..services.email import notify_compile_failed
 
@@ -29,9 +29,10 @@ async def compile_with_retry(
         resp = None
         for service_url in service_urls:
             try:
-                resp = await http.post(
-                    f"{service_url}/compile",
-                    json={"tex": current_tex, "engine": "pdflatex", "jobname": "resume"},
+                resp = await post_compile(
+                    http,
+                    service_url,
+                    {"tex": current_tex, "engine": "pdflatex", "jobname": "resume"},
                     timeout=150.0,
                 )
                 break

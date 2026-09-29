@@ -112,11 +112,11 @@ async def test_compile_falls_back_to_public_service_when_configured_url_fails():
 
 
 async def test_compile_with_retry_tolerates_non_json_error_body():
-    """An HTML 502 from the compile service must be treated as a failed attempt, not crash."""
+    """An HTML 500 from the compile service must be treated as a failed attempt, not crash."""
     class _Html:
-        status_code = 502
+        status_code = 500
         content = b""
-        text = "<html>Bad Gateway</html>"
+        text = "<html>Internal Server Error</html>"
 
         def json(self):
             raise ValueError("Expecting value")
@@ -129,4 +129,4 @@ async def test_compile_with_retry_tolerates_non_json_error_body():
     )
 
     assert pdf is None
-    assert "Bad Gateway" in err
+    assert "Internal Server Error" in err

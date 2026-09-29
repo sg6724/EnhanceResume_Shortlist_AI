@@ -40,16 +40,16 @@ def _http_returning(resp: httpx.Response):
 
 
 async def test_update_tex_survives_non_json_compile_error_body():
-    """Render's proxy answers a cold compile service with an HTML 502. That must come
+    """A proxy in front of the compile service can answer with an HTML error page. That must come
     back as a normal {"status": "failed"} payload (so CORS headers are attached and the
     UI can show it), not an unhandled 500 that the browser reports as "Failed to fetch"."""
     sb = _seed()
-    http = _http_returning(httpx.Response(502, text="<html>Bad Gateway</html>"))
+    http = _http_returning(httpx.Response(500, text="<html>Internal Server Error</html>"))
 
     out = await copies.update_tex("c1", copies.TexUpdateIn(tex_content="new"), _Request(sb, http))
 
     assert out["status"] == "failed"
-    assert "502" in out["log"] or "Bad Gateway" in out["log"]
+    assert "500" in out["log"]
     assert sb.tables["resume_copies"][0]["status"] == "failed"
 
 

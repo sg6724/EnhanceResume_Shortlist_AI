@@ -1,10 +1,38 @@
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from .config import settings
 
 PUBLIC_COMPILE_SERVICE_URL = "https://gethired-compile.onrender.com"
+
+# Render's free tier answers 429/502/503/504 while the compile service is cold-starting
+# or briefly saturated. Those are transient, unlike a real LaTeX error (422).
+TRANSIENT_STATUSES = {429, 502, 503, 504}
+MAX_ATTEMPTS = 4
+_BACKOFF_SECONDS = (3.0, 8.0, 15.0)
+
+
+async def _sleep(seconds: float) -> None:
+    await asyncio.sleep(seconds)
+
+
+async def post_compile(
+    http: httpx.AsyncClient, service_url: str, payload: dict, timeout: float | None = None
+) -> httpx.Response:
+    """POST to one compile service, retrying transient proxy errors with backoff."""
+    kwargs = {"json": payload}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    resp = await http.post(f"{service_url}/compile", **kwargs)
+    for delay in _BACKOFF_SECONDS[: MAX_ATTEMPTS - 1]:
+        if resp.status_code not in TRANSIENT_STATUSES:
+            break
+        await _sleep(delay)
+        resp = await http.post(f"{service_url}/compile", **kwargs)
+    return resp
 
 
 def _compile_service_urls() -> list[str]:
@@ -23,9 +51,8 @@ async def compile_tex(
     last_error = ""
     for service_url in _compile_service_urls():
         try:
-            return await http.post(
-                f"{service_url}/compile",
-                json={"tex": tex, "engine": engine, "jobname": jobname},
+            return await post_compile(
+                http, service_url, {"tex": tex, "engine": engine, "jobname": jobname}
             )
         except Exception as e:
             last_error = f"HTTP error calling compile service at {service_url}: {e}"
