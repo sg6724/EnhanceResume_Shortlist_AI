@@ -49,6 +49,10 @@ export default function CopiesPage() {
           : `Compile failed: ${(res.log ?? "").slice(0, 200)}`,
         ok: res.status === "compiled",
       });
+      // `selected` was fetched before the compile, so refetch it to pick up the new
+      // pdf_storage_path/status; otherwise the preview keeps saying "No PDF yet".
+      const fresh = await api.copy(selected.id);
+      setSelected(fresh);
       if (res.status === "compiled") setPdfRefreshKey((k) => k + 1);
       await load();
     } catch (e: any) {
